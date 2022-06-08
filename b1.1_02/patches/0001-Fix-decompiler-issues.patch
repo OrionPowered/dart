@@ -1,0 +1,2713 @@
+From 36e85edba29229a813400083048054e849119d51 Mon Sep 17 00:00:00 2001
+From: Alex Sobiek <alex@alexsobiek.com>
+Date: Wed, 8 Jun 2022 03:13:58 -0500
+Subject: [PATCH] Fix decompiler issues
+
+---
+ .../ChunkProviderLoadOrGenerate.java          |   9 +-
+ .../net/minecraft/ChunkProviderServer.java    |   9 +-
+ .../net/minecraft/CompressedStreamTools.java  |   5 +
+ main/java/net/minecraft/CraftingManager.java  |  17 +-
+ main/java/net/minecraft/EntityPainting.java   |  13 +-
+ main/java/net/minecraft/EntityPlayerMP.java   |  19 +-
+ main/java/net/minecraft/EntityTracker.java    |   2 +-
+ .../net/minecraft/EntityTrackerEntry.java     |  11 +-
+ main/java/net/minecraft/EnumArt.java          |  16 +-
+ main/java/net/minecraft/EnumCreatureType.java |  13 +-
+ main/java/net/minecraft/EnumSkyBlock.java     |   5 +-
+ main/java/net/minecraft/NBTBase.java          |   4 +
+ main/java/net/minecraft/NBTTagByte.java       |   4 +
+ main/java/net/minecraft/NBTTagByteArray.java  |   4 +
+ main/java/net/minecraft/NBTTagCompound.java   |   6 +-
+ main/java/net/minecraft/NBTTagDouble.java     |   4 +
+ main/java/net/minecraft/NBTTagFloat.java      |   4 +
+ main/java/net/minecraft/NBTTagInt.java        |   4 +
+ main/java/net/minecraft/NBTTagList.java       |   4 +
+ main/java/net/minecraft/NBTTagLong.java       |   4 +
+ main/java/net/minecraft/NBTTagShort.java      |   4 +
+ main/java/net/minecraft/NBTTagString.java     |   4 +
+ .../net/minecraft/NetworkAcceptThread.java    |   2 +-
+ .../net/minecraft/NetworkListenThread.java    |   3 +-
+ main/java/net/minecraft/NetworkManager.java   |   3 +
+ .../net/minecraft/NetworkReaderThread.java    |   2 +-
+ .../net/minecraft/NetworkWriterThread.java    |   2 +-
+ .../java/net/minecraft/NextTickListEntry.java |   8 +
+ main/java/net/minecraft/Packet.java           |   4 +
+ main/java/net/minecraft/Packet100.java        |   4 +
+ main/java/net/minecraft/Packet101.java        |   4 +
+ main/java/net/minecraft/Packet102.java        |   4 +
+ main/java/net/minecraft/Packet103.java        |   4 +
+ main/java/net/minecraft/Packet104.java        |   4 +
+ main/java/net/minecraft/Packet105.java        |   4 +
+ main/java/net/minecraft/Packet106.java        |   4 +
+ main/java/net/minecraft/Packet10Flying.java   |   4 +
+ .../net/minecraft/Packet11PlayerPosition.java |   4 +
+ .../net/minecraft/Packet12PlayerLook.java     |   4 +
+ main/java/net/minecraft/Packet130.java        |   4 +
+ .../net/minecraft/Packet13PlayerLookMove.java |   4 +
+ main/java/net/minecraft/Packet14BlockDig.java |   4 +
+ main/java/net/minecraft/Packet15Place.java    |   4 +
+ .../minecraft/Packet16BlockItemSwitch.java    |   4 +
+ .../net/minecraft/Packet18ArmAnimation.java   |   4 +
+ main/java/net/minecraft/Packet1Login.java     |   4 +
+ .../minecraft/Packet20NamedEntitySpawn.java   |   4 +
+ .../net/minecraft/Packet21PickupSpawn.java    |   4 +
+ main/java/net/minecraft/Packet22Collect.java  |   4 +
+ .../net/minecraft/Packet23VehicleSpawn.java   |   4 +
+ main/java/net/minecraft/Packet24MobSpawn.java |   4 +
+ .../minecraft/Packet255KickDisconnect.java    |   4 +
+ main/java/net/minecraft/Packet28.java         |   4 +
+ .../net/minecraft/Packet29DestroyEntity.java  |   4 +
+ main/java/net/minecraft/Packet2Handshake.java |   4 +
+ main/java/net/minecraft/Packet30Entity.java   |   4 +
+ .../net/minecraft/Packet31RelEntityMove.java  |   4 +
+ .../net/minecraft/Packet32EntityLook.java     |   4 +
+ .../minecraft/Packet33RelEntityMoveLook.java  |   4 +
+ .../net/minecraft/Packet34EntityTeleport.java |   4 +
+ main/java/net/minecraft/Packet38.java         |   4 +
+ main/java/net/minecraft/Packet39.java         |   4 +
+ main/java/net/minecraft/Packet3Chat.java      |   4 +
+ .../java/net/minecraft/Packet4UpdateTime.java |   4 +
+ main/java/net/minecraft/Packet50PreChunk.java |   4 +
+ main/java/net/minecraft/Packet51MapChunk.java |   4 +
+ .../minecraft/Packet52MultiBlockChange.java   |   4 +
+ .../net/minecraft/Packet53BlockChange.java    |   4 +
+ .../net/minecraft/Packet5PlayerInventory.java |   4 +
+ main/java/net/minecraft/Packet60.java         |  10 +-
+ .../net/minecraft/Packet6SpawnPosition.java   |   4 +
+ main/java/net/minecraft/Packet7.java          |   4 +
+ main/java/net/minecraft/Packet8.java          |   4 +
+ main/java/net/minecraft/RecipeSorter.java     |   7 +
+ .../minecraft/ServerConfigurationManager.java |   6 +-
+ main/java/net/minecraft/SlotArmor.java        |   2 +-
+ main/java/net/minecraft/SpawnerAnimals.java   |   4 +-
+ .../minecraft/ThreadServerApplication.java    |   2 +-
+ .../net/minecraft/ThreadSleepForever.java     |   6 +-
+ main/java/net/minecraft/World.java            |  36 ++-
+ .../net/minecraft/WorldGenLightStone1.java    |   3 +-
+ .../net/minecraft/WorldGenLightStone2.java    |   3 +-
+ main/java/net/minecraft/WorldServer.java      |   2 +-
+ .../net/minecraft/server/MinecraftServer.java | 260 +++++++++---------
+ 84 files changed, 465 insertions(+), 237 deletions(-)
+
+diff --git a/main/java/net/minecraft/ChunkProviderLoadOrGenerate.java b/main/java/net/minecraft/ChunkProviderLoadOrGenerate.java
+index dddeca2..6d22e0d 100644
+--- a/main/java/net/minecraft/ChunkProviderLoadOrGenerate.java
++++ b/main/java/net/minecraft/ChunkProviderLoadOrGenerate.java
+@@ -114,13 +114,8 @@ implements IChunkProvider {
+         if (this.field_721_e == null) {
+             return;
+         }
+-        try {
+-            chunk.lastSaveTime = this.worldObj.worldTime;
+-            this.field_721_e.func_662_a(this.worldObj, chunk);
+-        }
+-        catch (IOException iOException) {
+-            iOException.printStackTrace();
+-        }
++        chunk.lastSaveTime = this.worldObj.worldTime;
++        this.field_721_e.func_662_a(this.worldObj, chunk);
+     }
+ 
+     public void populate(IChunkProvider iChunkProvider, int n, int n2) {
+diff --git a/main/java/net/minecraft/ChunkProviderServer.java b/main/java/net/minecraft/ChunkProviderServer.java
+index 8c01b9b..86b1e5c 100644
+--- a/main/java/net/minecraft/ChunkProviderServer.java
++++ b/main/java/net/minecraft/ChunkProviderServer.java
+@@ -126,13 +126,8 @@ implements IChunkProvider {
+         if (this.field_729_d == null) {
+             return;
+         }
+-        try {
+-            chunk.lastSaveTime = this.field_726_g.worldTime;
+-            this.field_729_d.func_662_a(this.field_726_g, chunk);
+-        }
+-        catch (IOException iOException) {
+-            iOException.printStackTrace();
+-        }
++        chunk.lastSaveTime = this.field_726_g.worldTime;
++        this.field_729_d.func_662_a(this.field_726_g, chunk);
+     }
+ 
+     public void populate(IChunkProvider iChunkProvider, int n, int n2) {
+diff --git a/main/java/net/minecraft/CompressedStreamTools.java b/main/java/net/minecraft/CompressedStreamTools.java
+index 3870a03..83cb1d7 100644
+--- a/main/java/net/minecraft/CompressedStreamTools.java
++++ b/main/java/net/minecraft/CompressedStreamTools.java
+@@ -12,6 +12,8 @@ import java.io.InputStream;
+ import java.io.OutputStream;
+ import java.util.zip.GZIPInputStream;
+ import java.util.zip.GZIPOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ import net.minecraft.NBTTagCompound;
+ 
+@@ -19,6 +21,7 @@ public class CompressedStreamTools {
+     /*
+      * WARNING - Removed try catching itself - possible behaviour change.
+      */
++    @SneakyThrows
+     public static NBTTagCompound func_770_a(InputStream inputStream) {
+         DataInputStream dataInputStream = new DataInputStream(new GZIPInputStream(inputStream));
+         try {
+@@ -33,6 +36,7 @@ public class CompressedStreamTools {
+     /*
+      * WARNING - Removed try catching itself - possible behaviour change.
+      */
++    @SneakyThrows
+     public static void writeGzippedCompoundToOutputStream(NBTTagCompound nBTTagCompound, OutputStream outputStream) {
+         DataOutputStream dataOutputStream = new DataOutputStream(new GZIPOutputStream(outputStream));
+         try {
+@@ -43,6 +47,7 @@ public class CompressedStreamTools {
+         }
+     }
+ 
++    @SneakyThrows
+     public static NBTTagCompound func_774_a(DataInput dataInput) {
+         NBTBase nBTBase = NBTBase.readTag(dataInput);
+         if (nBTBase instanceof NBTTagCompound) {
+diff --git a/main/java/net/minecraft/CraftingManager.java b/main/java/net/minecraft/CraftingManager.java
+index 10bd3da..f380bab 100644
+--- a/main/java/net/minecraft/CraftingManager.java
++++ b/main/java/net/minecraft/CraftingManager.java
+@@ -86,12 +86,13 @@ public class CraftingManager {
+         int n2 = 0;
+         int n3 = 0;
+         if (objectArray[n] instanceof String[]) {
+-            object = (String[])objectArray[n++];
+-            for (int i = 0; i < ((String[])object).length; ++i) {
+-                Object object2 = object[i];
++            String[] stringArray = (String[]) objectArray[n++];
++            // object = (String[])objectArray[n++];
++            for (int i = 0; i < ((String[])stringArray).length; ++i) {
++                String s1 = stringArray[i];
+                 ++n3;
+-                n2 = ((String)object2).length();
+-                string = string + (String)object2;
++                n2 = (s1).length();
++                string = string + s1;
+             }
+         } else {
+             while (objectArray[n] instanceof String) {
+@@ -101,7 +102,7 @@ public class CraftingManager {
+                 string = string + (String)object;
+             }
+         }
+-        object = new HashMap();
++        HashMap<Character, Integer> map = new HashMap<>();
+         while (n < objectArray.length) {
+             Character c = (Character)objectArray[n];
+             int n4 = 0;
+@@ -110,13 +111,13 @@ public class CraftingManager {
+             } else if (objectArray[n + 1] instanceof Block) {
+                 n4 = ((Block)objectArray[n + 1]).blockID;
+             }
+-            object.put(c, n4);
++            map.put(c, n4);
+             n += 2;
+         }
+         int[] nArray = new int[n2 * n3];
+         for (int i = 0; i < n2 * n3; ++i) {
+             char c = string.charAt(i);
+-            nArray[i] = object.containsKey(Character.valueOf(c)) ? (Integer)object.get(Character.valueOf(c)) : -1;
++            nArray[i] = map.containsKey(c) ? (Integer)map.get(c) : -1;
+         }
+         this.field_20154_b.add(new CraftingRecipe(n2, n3, nArray, itemStack));
+     }
+diff --git a/main/java/net/minecraft/EntityPainting.java b/main/java/net/minecraft/EntityPainting.java
+index dd0e119..4689eec 100644
+--- a/main/java/net/minecraft/EntityPainting.java
++++ b/main/java/net/minecraft/EntityPainting.java
+@@ -5,15 +5,6 @@ package net.minecraft;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
+-import net.minecraft.Entity;
+-import net.minecraft.EntityItem;
+-import net.minecraft.EnumArt;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-import net.minecraft.Material;
+-import net.minecraft.MathHelper;
+-import net.minecraft.NBTTagCompound;
+-import net.minecraft.World;
+ 
+ public class EntityPainting
+ extends Entity {
+@@ -167,7 +158,7 @@ extends Entity {
+ 
+     public void writeEntityToNBT(NBTTagCompound nBTTagCompound) {
+         nBTTagCompound.setByte("Dir", (byte)this.field_448_a);
+-        nBTTagCompound.setString("Motive", this.field_9185_b.field_857_y);
++        nBTTagCompound.setString("Motive", this.field_9185_b.name);
+         nBTTagCompound.setInteger("TileX", this.field_9188_d);
+         nBTTagCompound.setInteger("TileY", this.field_9187_e);
+         nBTTagCompound.setInteger("TileZ", this.field_9186_f);
+@@ -180,7 +171,7 @@ extends Entity {
+         this.field_9186_f = nBTTagCompound.getInteger("TileZ");
+         String string = nBTTagCompound.getString("Motive");
+         for (EnumArt enumArt : EnumArt.values()) {
+-            if (!enumArt.field_857_y.equals(string)) continue;
++            if (!enumArt.name.equals(string)) continue;
+             this.field_9185_b = enumArt;
+         }
+         if (this.field_9185_b == null) {
+diff --git a/main/java/net/minecraft/EntityPlayerMP.java b/main/java/net/minecraft/EntityPlayerMP.java
+index 0177f1f..84fa3ef 100644
+--- a/main/java/net/minecraft/EntityPlayerMP.java
++++ b/main/java/net/minecraft/EntityPlayerMP.java
+@@ -7,6 +7,8 @@ import java.util.HashSet;
+ import java.util.LinkedList;
+ import java.util.List;
+ import java.util.Set;
++import java.util.concurrent.CompletableFuture;
++
+ import net.minecraft.ChunkCoordIntPair;
+ import net.minecraft.CraftingInventoryCB;
+ import net.minecraft.CraftingInventoryChestCB;
+@@ -47,7 +49,7 @@ implements ICrafting {
+     public ItemInWorldManager field_425_ad;
+     public double field_9155_d;
+     public double field_9154_e;
+-    public List loadedChunks = new LinkedList();
++    public List<ChunkCoordIntPair> loadedChunks = new LinkedList();
+     public Set field_420_ah = new HashSet();
+     public double field_418_ai;
+     public boolean field_12012_al = false;
+@@ -135,17 +137,16 @@ implements ICrafting {
+     }
+ 
+     public void func_175_i() {
+-        Object object;
+         int n;
+         super.onUpdate();
+         ChunkCoordIntPair chunkCoordIntPair = null;
+         double d = 0.0;
+         for (n = 0; n < this.loadedChunks.size(); ++n) {
+-            object = (ChunkCoordIntPair)this.loadedChunks.get(n);
+-            double d2 = ((ChunkCoordIntPair)object).func_73_a(this);
++            ChunkCoordIntPair ccip = this.loadedChunks.get(n);
++            double d2 = ccip.func_73_a(this);
+             if (n != 0 && !(d2 < d)) continue;
+-            chunkCoordIntPair = object;
+-            d = ((ChunkCoordIntPair)object).func_73_a(this);
++            chunkCoordIntPair = ccip;
++            d = chunkCoordIntPair.func_73_a(this);
+         }
+         if (chunkCoordIntPair != null) {
+             n = 0;
+@@ -158,9 +159,9 @@ implements ICrafting {
+             if (n != 0) {
+                 this.loadedChunks.remove(chunkCoordIntPair);
+                 this.field_421_a.sendPacket(new Packet51MapChunk(chunkCoordIntPair.chunkXPos * 16, 0, chunkCoordIntPair.chunkZPos * 16, 16, 128, 16, this.mcServer.worldMngr));
+-                object = this.mcServer.worldMngr.func_532_d(chunkCoordIntPair.chunkXPos * 16, 0, chunkCoordIntPair.chunkZPos * 16, chunkCoordIntPair.chunkXPos * 16 + 16, 128, chunkCoordIntPair.chunkZPos * 16 + 16);
+-                for (int i = 0; i < object.size(); ++i) {
+-                    this.func_20063_a((TileEntity)object.get(i));
++                List<TileEntity> entities = this.mcServer.worldMngr.func_532_d(chunkCoordIntPair.chunkXPos * 16, 0, chunkCoordIntPair.chunkZPos * 16, chunkCoordIntPair.chunkXPos * 16 + 16, 128, chunkCoordIntPair.chunkZPos * 16 + 16);
++                for (int i = 0; i < entities.size(); ++i) {
++                    this.func_20063_a((TileEntity)entities.get(i));
+                 }
+             }
+         }
+diff --git a/main/java/net/minecraft/EntityTracker.java b/main/java/net/minecraft/EntityTracker.java
+index 7819f25..b39406d 100644
+--- a/main/java/net/minecraft/EntityTracker.java
++++ b/main/java/net/minecraft/EntityTracker.java
+@@ -24,7 +24,7 @@ import net.minecraft.Packet;
+ import net.minecraft.server.MinecraftServer;
+ 
+ public class EntityTracker {
+-    private Set field_911_a = new HashSet();
++    private Set<EntityTrackerEntry> field_911_a = new HashSet<>();
+     private MCHashTable field_910_b = new MCHashTable();
+     private MinecraftServer mcServer;
+     private int field_912_d;
+diff --git a/main/java/net/minecraft/EntityTrackerEntry.java b/main/java/net/minecraft/EntityTrackerEntry.java
+index c7960e4..b08b9d8 100644
+--- a/main/java/net/minecraft/EntityTrackerEntry.java
++++ b/main/java/net/minecraft/EntityTrackerEntry.java
+@@ -59,7 +59,7 @@ public class EntityTrackerEntry {
+     private boolean field_12020_u = false;
+     private boolean field_9220_u;
+     public boolean field_900_j = false;
+-    public Set field_899_k = new HashSet();
++    public Set<EntityPlayerMP> field_899_k = new HashSet<>();
+ 
+     public EntityTrackerEntry(Entity entity, int n, int n2, boolean bl) {
+         this.field_909_a = entity;
+@@ -233,15 +233,14 @@ public class EntityTrackerEntry {
+         if (this.field_909_a instanceof EntityPlayerMP) {
+             return new Packet20NamedEntitySpawn((EntityPlayer)this.field_909_a);
+         }
+-        if (this.field_909_a instanceof EntityMinecart) {
+-            entity = (EntityMinecart)this.field_909_a;
+-            if (entity.minecartType == 0) {
++        if (this.field_909_a instanceof EntityMinecart e) {
++            if (e.minecartType == 0) {
+                 return new Packet23VehicleSpawn(this.field_909_a, 10);
+             }
+-            if (entity.minecartType == 1) {
++            if (e.minecartType == 1) {
+                 return new Packet23VehicleSpawn(this.field_909_a, 11);
+             }
+-            if (entity.minecartType == 2) {
++            if (e.minecartType == 2) {
+                 return new Packet23VehicleSpawn(this.field_909_a, 12);
+             }
+         }
+diff --git a/main/java/net/minecraft/EnumArt.java b/main/java/net/minecraft/EnumArt.java
+index 1d1c4fd..ced8a35 100644
+--- a/main/java/net/minecraft/EnumArt.java
++++ b/main/java/net/minecraft/EnumArt.java
+@@ -29,7 +29,7 @@ public enum EnumArt {
+     Skeleton("Skeleton", 64, 48, 192, 64),
+     DonkeyKong("DonkeyKong", 64, 48, 192, 112);
+ 
+-    public final String field_857_y;
++    public final String name;
+     public final int field_856_z;
+     public final int field_869_A;
+     public final int field_867_B;
+@@ -39,14 +39,12 @@ public enum EnumArt {
+      * WARNING - Possible parameter corruption
+      * WARNING - void declaration
+      */
+-    private EnumArt(int n, int n2, int n3) {
+-        void var7_5;
+-        void var6_4;
+-        this.field_857_y = (String)n;
+-        this.field_856_z = n2;
+-        this.field_869_A = n3;
+-        this.field_867_B = var6_4;
+-        this.field_865_C = var7_5;
++    private EnumArt(String name, int n1, int n2, int n3, int n4) {
++        this.name = name;
++        this.field_856_z = n1;
++        this.field_869_A = n2;
++        this.field_867_B = n3;
++        this.field_865_C = n4;
+     }
+ }
+ 
+diff --git a/main/java/net/minecraft/EnumCreatureType.java b/main/java/net/minecraft/EnumCreatureType.java
+index 92075f8..0114315 100644
+--- a/main/java/net/minecraft/EnumCreatureType.java
++++ b/main/java/net/minecraft/EnumCreatureType.java
+@@ -3,24 +3,19 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.EntityAnimals;
+-import net.minecraft.IMobs;
+-
+ public enum EnumCreatureType {
+     monster(IMobs.class, 100),
+     creature(EntityAnimals.class, 20);
+ 
+-    public final Class field_4221_c;
++    public final Class<? extends IAnimals> creatureClass;
+     public final int maxNumberOfEntityType;
+ 
+     /*
+      * WARNING - void declaration
+      */
+-    private EnumCreatureType() {
+-        void var4_2;
+-        void var3_1;
+-        this.field_4221_c = var3_1;
+-        this.maxNumberOfEntityType = var4_2;
++    EnumCreatureType(Class<? extends IAnimals> creatureClass, int maxNumberOfEntityType) {
++        this.creatureClass = creatureClass;
++        this.maxNumberOfEntityType = maxNumberOfEntityType;
+     }
+ }
+ 
+diff --git a/main/java/net/minecraft/EnumSkyBlock.java b/main/java/net/minecraft/EnumSkyBlock.java
+index 48578a9..76ee851 100644
+--- a/main/java/net/minecraft/EnumSkyBlock.java
++++ b/main/java/net/minecraft/EnumSkyBlock.java
+@@ -13,9 +13,8 @@ public enum EnumSkyBlock {
+      * WARNING - Possible parameter corruption
+      * WARNING - void declaration
+      */
+-    private EnumSkyBlock() {
+-        void var3_1;
+-        this.field_984_c = var3_1;
++    private EnumSkyBlock(int n) {
++        this.field_984_c = n;
+     }
+ }
+ 
+diff --git a/main/java/net/minecraft/NBTBase.java b/main/java/net/minecraft/NBTBase.java
+index 50f3b71..007190b 100644
+--- a/main/java/net/minecraft/NBTBase.java
++++ b/main/java/net/minecraft/NBTBase.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTTagByte;
+ import net.minecraft.NBTTagByteArray;
+ import net.minecraft.NBTTagCompound;
+@@ -38,6 +40,7 @@ public abstract class NBTBase {
+         return this;
+     }
+ 
++    @SneakyThrows
+     public static NBTBase readTag(DataInput dataInput) {
+         byte by = dataInput.readByte();
+         if (by == 0) {
+@@ -49,6 +52,7 @@ public abstract class NBTBase {
+         return nBTBase;
+     }
+ 
++    @SneakyThrows
+     public static void writeTag(NBTBase nBTBase, DataOutput dataOutput) {
+         dataOutput.writeByte(nBTBase.getType());
+         if (nBTBase.getType() == 0) {
+diff --git a/main/java/net/minecraft/NBTTagByte.java b/main/java/net/minecraft/NBTTagByte.java
+index 8a5cbc9..ad31672 100644
+--- a/main/java/net/minecraft/NBTTagByte.java
++++ b/main/java/net/minecraft/NBTTagByte.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagByte
+@@ -18,10 +20,12 @@ extends NBTBase {
+         this.byteValue = by;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeByte(this.byteValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.byteValue = dataInput.readByte();
+     }
+diff --git a/main/java/net/minecraft/NBTTagByteArray.java b/main/java/net/minecraft/NBTTagByteArray.java
+index c3fe2f0..fd21a21 100644
+--- a/main/java/net/minecraft/NBTTagByteArray.java
++++ b/main/java/net/minecraft/NBTTagByteArray.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagByteArray
+@@ -18,11 +20,13 @@ extends NBTBase {
+         this.byteArray = byArray;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeInt(this.byteArray.length);
+         dataOutput.write(this.byteArray);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         int n = dataInput.readInt();
+         this.byteArray = new byte[n];
+diff --git a/main/java/net/minecraft/NBTTagCompound.java b/main/java/net/minecraft/NBTTagCompound.java
+index dd07745..33b98b1 100644
+--- a/main/java/net/minecraft/NBTTagCompound.java
++++ b/main/java/net/minecraft/NBTTagCompound.java
+@@ -5,8 +5,11 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++import java.io.IOException;
+ import java.util.HashMap;
+ import java.util.Map;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ import net.minecraft.NBTTagByte;
+ import net.minecraft.NBTTagByteArray;
+@@ -20,8 +23,9 @@ import net.minecraft.NBTTagString;
+ 
+ public class NBTTagCompound
+ extends NBTBase {
+-    private Map tagMap = new HashMap();
++    private Map<String, NBTBase> tagMap = new HashMap();
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         for (NBTBase nBTBase : this.tagMap.values()) {
+             NBTBase.writeTag(nBTBase, dataOutput);
+diff --git a/main/java/net/minecraft/NBTTagDouble.java b/main/java/net/minecraft/NBTTagDouble.java
+index 48b99ad..76394b4 100644
+--- a/main/java/net/minecraft/NBTTagDouble.java
++++ b/main/java/net/minecraft/NBTTagDouble.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagDouble
+@@ -18,10 +20,12 @@ extends NBTBase {
+         this.doubleValue = d;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeDouble(this.doubleValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.doubleValue = dataInput.readDouble();
+     }
+diff --git a/main/java/net/minecraft/NBTTagFloat.java b/main/java/net/minecraft/NBTTagFloat.java
+index cca78b4..0190dee 100644
+--- a/main/java/net/minecraft/NBTTagFloat.java
++++ b/main/java/net/minecraft/NBTTagFloat.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagFloat
+@@ -18,10 +20,12 @@ extends NBTBase {
+         this.floatValue = f;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeFloat(this.floatValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.floatValue = dataInput.readFloat();
+     }
+diff --git a/main/java/net/minecraft/NBTTagInt.java b/main/java/net/minecraft/NBTTagInt.java
+index 4c41fe2..ca8b2ec 100644
+--- a/main/java/net/minecraft/NBTTagInt.java
++++ b/main/java/net/minecraft/NBTTagInt.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagInt
+@@ -18,10 +20,12 @@ extends NBTBase {
+         this.intValue = n;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeInt(this.intValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.intValue = dataInput.readInt();
+     }
+diff --git a/main/java/net/minecraft/NBTTagList.java b/main/java/net/minecraft/NBTTagList.java
+index 8377740..4259ea2 100644
+--- a/main/java/net/minecraft/NBTTagList.java
++++ b/main/java/net/minecraft/NBTTagList.java
+@@ -7,6 +7,8 @@ import java.io.DataInput;
+ import java.io.DataOutput;
+ import java.util.ArrayList;
+ import java.util.List;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagList
+@@ -14,6 +16,7 @@ extends NBTBase {
+     private List tagList = new ArrayList();
+     private byte tagType;
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         this.tagType = this.tagList.size() > 0 ? ((NBTBase)this.tagList.get(0)).getType() : (byte)1;
+         dataOutput.writeByte(this.tagType);
+@@ -23,6 +26,7 @@ extends NBTBase {
+         }
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.tagType = dataInput.readByte();
+         int n = dataInput.readInt();
+diff --git a/main/java/net/minecraft/NBTTagLong.java b/main/java/net/minecraft/NBTTagLong.java
+index 1ae10e1..b03cd7c 100644
+--- a/main/java/net/minecraft/NBTTagLong.java
++++ b/main/java/net/minecraft/NBTTagLong.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagLong
+@@ -18,10 +20,12 @@ extends NBTBase {
+         this.longValue = l;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeLong(this.longValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.longValue = dataInput.readLong();
+     }
+diff --git a/main/java/net/minecraft/NBTTagShort.java b/main/java/net/minecraft/NBTTagShort.java
+index b3218f2..68dabf2 100644
+--- a/main/java/net/minecraft/NBTTagShort.java
++++ b/main/java/net/minecraft/NBTTagShort.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagShort
+@@ -18,10 +20,12 @@ extends NBTBase {
+         this.shortValue = s;
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeShort(this.shortValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.shortValue = dataInput.readShort();
+     }
+diff --git a/main/java/net/minecraft/NBTTagString.java b/main/java/net/minecraft/NBTTagString.java
+index a46c513..10aaaf1 100644
+--- a/main/java/net/minecraft/NBTTagString.java
++++ b/main/java/net/minecraft/NBTTagString.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInput;
+ import java.io.DataOutput;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NBTBase;
+ 
+ public class NBTTagString
+@@ -21,10 +23,12 @@ extends NBTBase {
+         }
+     }
+ 
++    @SneakyThrows
+     void writeTagContents(DataOutput dataOutput) {
+         dataOutput.writeUTF(this.stringValue);
+     }
+ 
++    @SneakyThrows
+     void readTagContents(DataInput dataInput) {
+         this.stringValue = dataInput.readUTF();
+     }
+diff --git a/main/java/net/minecraft/NetworkAcceptThread.java b/main/java/net/minecraft/NetworkAcceptThread.java
+index 2a1b3d3..770e31c 100644
+--- a/main/java/net/minecraft/NetworkAcceptThread.java
++++ b/main/java/net/minecraft/NetworkAcceptThread.java
+@@ -15,9 +15,9 @@ extends Thread {
+     final /* synthetic */ NetworkListenThread field_985_b;
+ 
+     NetworkAcceptThread(NetworkListenThread networkListenThread, String string, MinecraftServer minecraftServer) {
++        super(string);
+         this.field_985_b = networkListenThread;
+         this.mcServer = minecraftServer;
+-        super(string);
+     }
+ 
+     public void run() {
+diff --git a/main/java/net/minecraft/NetworkListenThread.java b/main/java/net/minecraft/NetworkListenThread.java
+index f353a3d..210d1e0 100644
+--- a/main/java/net/minecraft/NetworkListenThread.java
++++ b/main/java/net/minecraft/NetworkListenThread.java
+@@ -3,6 +3,7 @@
+  */
+ package net.minecraft;
+ 
++import java.io.IOException;
+ import java.net.InetAddress;
+ import java.net.ServerSocket;
+ import java.util.ArrayList;
+@@ -24,7 +25,7 @@ public class NetworkListenThread {
+     private ArrayList field_975_h = new ArrayList();
+     public MinecraftServer mcServer;
+ 
+-    public NetworkListenThread(MinecraftServer minecraftServer, InetAddress inetAddress, int n) {
++    public NetworkListenThread(MinecraftServer minecraftServer, InetAddress inetAddress, int n) throws IOException {
+         this.mcServer = minecraftServer;
+         this.serverSocket = new ServerSocket(n, 0, inetAddress);
+         this.serverSocket.setPerformancePreferences(0, 2, 1);
+diff --git a/main/java/net/minecraft/NetworkManager.java b/main/java/net/minecraft/NetworkManager.java
+index afc2f4a..c4f5b10 100644
+--- a/main/java/net/minecraft/NetworkManager.java
++++ b/main/java/net/minecraft/NetworkManager.java
+@@ -10,6 +10,8 @@ import java.net.SocketAddress;
+ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.List;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.NetworkMasterThread;
+ import net.minecraft.NetworkReaderThread;
+@@ -42,6 +44,7 @@ public class NetworkManager {
+     public int chunkDataSendCounter = 0;
+     private int field_20175_w = 0;
+ 
++    @SneakyThrows
+     public NetworkManager(Socket socket, String string, NetHandler netHandler) {
+         this.networkSocket = socket;
+         this.field_12032_f = socket.getRemoteSocketAddress();
+diff --git a/main/java/net/minecraft/NetworkReaderThread.java b/main/java/net/minecraft/NetworkReaderThread.java
+index bf135c8..7eb586f 100644
+--- a/main/java/net/minecraft/NetworkReaderThread.java
++++ b/main/java/net/minecraft/NetworkReaderThread.java
+@@ -10,8 +10,8 @@ extends Thread {
+     final /* synthetic */ NetworkManager netManager;
+ 
+     NetworkReaderThread(NetworkManager networkManager, String string) {
+-        this.netManager = networkManager;
+         super(string);
++        this.netManager = networkManager;
+     }
+ 
+     /*
+diff --git a/main/java/net/minecraft/NetworkWriterThread.java b/main/java/net/minecraft/NetworkWriterThread.java
+index b55a8d5..525d5ad 100644
+--- a/main/java/net/minecraft/NetworkWriterThread.java
++++ b/main/java/net/minecraft/NetworkWriterThread.java
+@@ -10,8 +10,8 @@ extends Thread {
+     final /* synthetic */ NetworkManager netManager;
+ 
+     NetworkWriterThread(NetworkManager networkManager, String string) {
+-        this.netManager = networkManager;
+         super(string);
++        this.netManager = networkManager;
+     }
+ 
+     /*
+diff --git a/main/java/net/minecraft/NextTickListEntry.java b/main/java/net/minecraft/NextTickListEntry.java
+index befdfca..3658331 100644
+--- a/main/java/net/minecraft/NextTickListEntry.java
++++ b/main/java/net/minecraft/NextTickListEntry.java
+@@ -52,5 +52,13 @@ implements Comparable {
+         }
+         return 0;
+     }
++
++
++    @Override
++    public int compareTo(Object other) {
++        if (other instanceof NextTickListEntry nextTickListEntry) {
++            return comparer(nextTickListEntry);
++        } else return -1;
++    }
+ }
+ 
+diff --git a/main/java/net/minecraft/Packet.java b/main/java/net/minecraft/Packet.java
+index a94ec2f..cf97b85 100644
+--- a/main/java/net/minecraft/Packet.java
++++ b/main/java/net/minecraft/Packet.java
+@@ -8,6 +8,8 @@ import java.io.DataOutputStream;
+ import java.io.IOException;
+ import java.util.HashMap;
+ import java.util.Map;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet0KeepAlive;
+ import net.minecraft.Packet100;
+@@ -92,6 +94,7 @@ public abstract class Packet {
+         return (Integer)packetClassToIdMap.get(this.getClass());
+     }
+ 
++    @SneakyThrows
+     public static Packet readPacket(DataInputStream dataInputStream) {
+         int n = dataInputStream.read();
+         if (n == -1) {
+@@ -105,6 +108,7 @@ public abstract class Packet {
+         return packet;
+     }
+ 
++    @SneakyThrows
+     public static void writePacket(Packet packet, DataOutputStream dataOutputStream) {
+         dataOutputStream.write(packet.getPacketId());
+         packet.writePacketData(dataOutputStream);
+diff --git a/main/java/net/minecraft/Packet100.java b/main/java/net/minecraft/Packet100.java
+index af31d72..1207a4c 100644
+--- a/main/java/net/minecraft/Packet100.java
++++ b/main/java/net/minecraft/Packet100.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -29,6 +31,7 @@ extends Packet {
+         netHandler.func_20004_a(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20013_a = dataInputStream.readByte();
+         this.field_20012_b = dataInputStream.readByte();
+@@ -36,6 +39,7 @@ extends Packet {
+         this.field_20014_d = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20013_a);
+         dataOutputStream.writeByte(this.field_20012_b);
+diff --git a/main/java/net/minecraft/Packet101.java b/main/java/net/minecraft/Packet101.java
+index bc71556..2b33db7 100644
+--- a/main/java/net/minecraft/Packet101.java
++++ b/main/java/net/minecraft/Packet101.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -23,10 +25,12 @@ extends Packet {
+         netHandler.func_20006_a(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20032_a = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20032_a);
+     }
+diff --git a/main/java/net/minecraft/Packet102.java b/main/java/net/minecraft/Packet102.java
+index d2e388b..716deee 100644
+--- a/main/java/net/minecraft/Packet102.java
++++ b/main/java/net/minecraft/Packet102.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.ItemStack;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -21,6 +23,7 @@ extends Packet {
+         netHandler.func_20007_a(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20024_a = dataInputStream.readByte();
+         this.field_20023_b = dataInputStream.readShort();
+@@ -36,6 +39,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20024_a);
+         dataOutputStream.writeShort(this.field_20023_b);
+diff --git a/main/java/net/minecraft/Packet103.java b/main/java/net/minecraft/Packet103.java
+index a835eff..2c11c72 100644
+--- a/main/java/net/minecraft/Packet103.java
++++ b/main/java/net/minecraft/Packet103.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.ItemStack;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -28,6 +30,7 @@ extends Packet {
+         netHandler.func_20003_a(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20017_a = dataInputStream.readByte();
+         this.field_20016_b = dataInputStream.readShort();
+@@ -41,6 +44,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20017_a);
+         dataOutputStream.writeShort(this.field_20016_b);
+diff --git a/main/java/net/minecraft/Packet104.java b/main/java/net/minecraft/Packet104.java
+index ac29eab..cc08aec 100644
+--- a/main/java/net/minecraft/Packet104.java
++++ b/main/java/net/minecraft/Packet104.java
+@@ -6,6 +6,8 @@ package net.minecraft;
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
+ import java.util.List;
++
++import lombok.SneakyThrows;
+ import net.minecraft.ItemStack;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -27,6 +29,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20011_a = dataInputStream.readByte();
+         int n = dataInputStream.readShort();
+@@ -40,6 +43,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20011_a);
+         dataOutputStream.writeShort(this.field_20010_b.length);
+diff --git a/main/java/net/minecraft/Packet105.java b/main/java/net/minecraft/Packet105.java
+index 61cf1ec..2ec5843 100644
+--- a/main/java/net/minecraft/Packet105.java
++++ b/main/java/net/minecraft/Packet105.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -27,12 +29,14 @@ extends Packet {
+         netHandler.func_20002_a(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20030_a = dataInputStream.readByte();
+         this.field_20029_b = dataInputStream.readShort();
+         this.field_20031_c = dataInputStream.readShort();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20030_a);
+         dataOutputStream.writeShort(this.field_20029_b);
+diff --git a/main/java/net/minecraft/Packet106.java b/main/java/net/minecraft/Packet106.java
+index 2212590..5710aa3 100644
+--- a/main/java/net/minecraft/Packet106.java
++++ b/main/java/net/minecraft/Packet106.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -27,12 +29,14 @@ extends Packet {
+         netHandler.func_20008_a(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20034_a = dataInputStream.readByte();
+         this.field_20033_b = dataInputStream.readShort();
+         this.field_20035_c = dataInputStream.readByte() != 0;
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeByte(this.field_20034_a);
+         dataOutputStream.writeShort(this.field_20033_b);
+diff --git a/main/java/net/minecraft/Packet10Flying.java b/main/java/net/minecraft/Packet10Flying.java
+index bfcd0cd..5673114 100644
+--- a/main/java/net/minecraft/Packet10Flying.java
++++ b/main/java/net/minecraft/Packet10Flying.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -24,10 +26,12 @@ extends Packet {
+         netHandler.handleFlying(this);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.onGround = dataInputStream.read() != 0;
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.write(this.onGround ? 1 : 0);
+     }
+diff --git a/main/java/net/minecraft/Packet11PlayerPosition.java b/main/java/net/minecraft/Packet11PlayerPosition.java
+index 01f2f03..82ee405 100644
+--- a/main/java/net/minecraft/Packet11PlayerPosition.java
++++ b/main/java/net/minecraft/Packet11PlayerPosition.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Packet10Flying;
+ 
+ public class Packet11PlayerPosition
+@@ -13,6 +15,7 @@ extends Packet10Flying {
+         this.moving = true;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readDouble();
+         this.yPosition = dataInputStream.readDouble();
+@@ -21,6 +24,7 @@ extends Packet10Flying {
+         super.readPacketData(dataInputStream);
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeDouble(this.xPosition);
+         dataOutputStream.writeDouble(this.yPosition);
+diff --git a/main/java/net/minecraft/Packet12PlayerLook.java b/main/java/net/minecraft/Packet12PlayerLook.java
+index 90af9cf..a5ec212 100644
+--- a/main/java/net/minecraft/Packet12PlayerLook.java
++++ b/main/java/net/minecraft/Packet12PlayerLook.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Packet10Flying;
+ 
+ public class Packet12PlayerLook
+@@ -13,12 +15,14 @@ extends Packet10Flying {
+         this.rotating = true;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.yaw = dataInputStream.readFloat();
+         this.pitch = dataInputStream.readFloat();
+         super.readPacketData(dataInputStream);
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeFloat(this.yaw);
+         dataOutputStream.writeFloat(this.pitch);
+diff --git a/main/java/net/minecraft/Packet130.java b/main/java/net/minecraft/Packet130.java
+index f9022e0..4f08795 100644
+--- a/main/java/net/minecraft/Packet130.java
++++ b/main/java/net/minecraft/Packet130.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -27,6 +29,7 @@ extends Packet {
+         this.field_20021_d = stringArray;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_20020_a = dataInputStream.readInt();
+         this.field_20019_b = dataInputStream.readShort();
+@@ -37,6 +40,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.field_20020_a);
+         dataOutputStream.writeShort(this.field_20019_b);
+diff --git a/main/java/net/minecraft/Packet13PlayerLookMove.java b/main/java/net/minecraft/Packet13PlayerLookMove.java
+index 4fe3e45..db6060e 100644
+--- a/main/java/net/minecraft/Packet13PlayerLookMove.java
++++ b/main/java/net/minecraft/Packet13PlayerLookMove.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Packet10Flying;
+ 
+ public class Packet13PlayerLookMove
+@@ -26,6 +28,7 @@ extends Packet10Flying {
+         this.moving = true;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readDouble();
+         this.yPosition = dataInputStream.readDouble();
+@@ -36,6 +39,7 @@ extends Packet10Flying {
+         super.readPacketData(dataInputStream);
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeDouble(this.xPosition);
+         dataOutputStream.writeDouble(this.yPosition);
+diff --git a/main/java/net/minecraft/Packet14BlockDig.java b/main/java/net/minecraft/Packet14BlockDig.java
+index 2a3d518..750a406 100644
+--- a/main/java/net/minecraft/Packet14BlockDig.java
++++ b/main/java/net/minecraft/Packet14BlockDig.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -16,6 +18,7 @@ extends Packet {
+     public int face;
+     public int status;
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.status = dataInputStream.read();
+         this.xPosition = dataInputStream.readInt();
+@@ -24,6 +27,7 @@ extends Packet {
+         this.face = dataInputStream.read();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.write(this.status);
+         dataOutputStream.writeInt(this.xPosition);
+diff --git a/main/java/net/minecraft/Packet15Place.java b/main/java/net/minecraft/Packet15Place.java
+index 63a51e4..78258ec 100644
+--- a/main/java/net/minecraft/Packet15Place.java
++++ b/main/java/net/minecraft/Packet15Place.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.ItemStack;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -17,6 +19,7 @@ extends Packet {
+     public int zPosition;
+     public ItemStack direction;
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.id = dataInputStream.readInt();
+         this.xPosition = dataInputStream.read();
+@@ -32,6 +35,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.id);
+         dataOutputStream.write(this.xPosition);
+diff --git a/main/java/net/minecraft/Packet16BlockItemSwitch.java b/main/java/net/minecraft/Packet16BlockItemSwitch.java
+index 207b6b2..c450cec 100644
+--- a/main/java/net/minecraft/Packet16BlockItemSwitch.java
++++ b/main/java/net/minecraft/Packet16BlockItemSwitch.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -12,10 +14,12 @@ public class Packet16BlockItemSwitch
+ extends Packet {
+     public int id;
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.id = dataInputStream.readShort();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeShort(this.id);
+     }
+diff --git a/main/java/net/minecraft/Packet18ArmAnimation.java b/main/java/net/minecraft/Packet18ArmAnimation.java
+index 4434df8..e5cec13 100644
+--- a/main/java/net/minecraft/Packet18ArmAnimation.java
++++ b/main/java/net/minecraft/Packet18ArmAnimation.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Entity;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -22,11 +24,13 @@ extends Packet {
+         this.animate = n;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+         this.animate = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+         dataOutputStream.writeByte(this.animate);
+diff --git a/main/java/net/minecraft/Packet1Login.java b/main/java/net/minecraft/Packet1Login.java
+index 665f237..fc6878a 100644
+--- a/main/java/net/minecraft/Packet1Login.java
++++ b/main/java/net/minecraft/Packet1Login.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -27,6 +29,7 @@ extends Packet {
+         this.field_4025_e = by;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.protocolVersion = dataInputStream.readInt();
+         this.username = dataInputStream.readUTF();
+@@ -35,6 +38,7 @@ extends Packet {
+         this.field_4025_e = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.protocolVersion);
+         dataOutputStream.writeUTF(this.username);
+diff --git a/main/java/net/minecraft/Packet20NamedEntitySpawn.java b/main/java/net/minecraft/Packet20NamedEntitySpawn.java
+index 2dd08cb..ab4f248 100644
+--- a/main/java/net/minecraft/Packet20NamedEntitySpawn.java
++++ b/main/java/net/minecraft/Packet20NamedEntitySpawn.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.EntityPlayer;
+ import net.minecraft.ItemStack;
+ import net.minecraft.MathHelper;
+@@ -37,6 +39,7 @@ extends Packet {
+         this.currentItem = itemStack == null ? 0 : itemStack.itemID;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+         this.name = dataInputStream.readUTF();
+@@ -48,6 +51,7 @@ extends Packet {
+         this.currentItem = dataInputStream.readShort();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+         dataOutputStream.writeUTF(this.name);
+diff --git a/main/java/net/minecraft/Packet21PickupSpawn.java b/main/java/net/minecraft/Packet21PickupSpawn.java
+index d5226a3..c659c75 100644
+--- a/main/java/net/minecraft/Packet21PickupSpawn.java
++++ b/main/java/net/minecraft/Packet21PickupSpawn.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.EntityItem;
+ import net.minecraft.MathHelper;
+ import net.minecraft.NetHandler;
+@@ -37,6 +39,7 @@ extends Packet {
+         this.roll = (byte)(entityItem.motionZ * 128.0);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+         this.itemId = dataInputStream.readShort();
+@@ -49,6 +52,7 @@ extends Packet {
+         this.roll = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+         dataOutputStream.writeShort(this.itemId);
+diff --git a/main/java/net/minecraft/Packet22Collect.java b/main/java/net/minecraft/Packet22Collect.java
+index 0e088d8..92feff1 100644
+--- a/main/java/net/minecraft/Packet22Collect.java
++++ b/main/java/net/minecraft/Packet22Collect.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -21,11 +23,13 @@ extends Packet {
+         this.collectorEntityId = n2;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.collectedEntityId = dataInputStream.readInt();
+         this.collectorEntityId = dataInputStream.readInt();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.collectedEntityId);
+         dataOutputStream.writeInt(this.collectorEntityId);
+diff --git a/main/java/net/minecraft/Packet23VehicleSpawn.java b/main/java/net/minecraft/Packet23VehicleSpawn.java
+index ddbc654..9b1a940 100644
+--- a/main/java/net/minecraft/Packet23VehicleSpawn.java
++++ b/main/java/net/minecraft/Packet23VehicleSpawn.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Entity;
+ import net.minecraft.MathHelper;
+ import net.minecraft.NetHandler;
+@@ -29,6 +31,7 @@ extends Packet {
+         this.type = n;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+         this.type = dataInputStream.readByte();
+@@ -37,6 +40,7 @@ extends Packet {
+         this.zPosition = dataInputStream.readInt();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+         dataOutputStream.writeByte(this.type);
+diff --git a/main/java/net/minecraft/Packet24MobSpawn.java b/main/java/net/minecraft/Packet24MobSpawn.java
+index 49f9098..626ff1c 100644
+--- a/main/java/net/minecraft/Packet24MobSpawn.java
++++ b/main/java/net/minecraft/Packet24MobSpawn.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.EntityList;
+ import net.minecraft.EntityLiving;
+ import net.minecraft.MathHelper;
+@@ -34,6 +36,7 @@ extends Packet {
+         this.pitch = (byte)(entityLiving.rotationPitch * 256.0f / 360.0f);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+         this.type = dataInputStream.readByte();
+@@ -44,6 +47,7 @@ extends Packet {
+         this.pitch = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+         dataOutputStream.writeByte(this.type);
+diff --git a/main/java/net/minecraft/Packet255KickDisconnect.java b/main/java/net/minecraft/Packet255KickDisconnect.java
+index ac463fd..36f5a26 100644
+--- a/main/java/net/minecraft/Packet255KickDisconnect.java
++++ b/main/java/net/minecraft/Packet255KickDisconnect.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -19,10 +21,12 @@ extends Packet {
+         this.reason = string;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.reason = dataInputStream.readUTF();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeUTF(this.reason);
+     }
+diff --git a/main/java/net/minecraft/Packet28.java b/main/java/net/minecraft/Packet28.java
+index 6308491..188c31d 100644
+--- a/main/java/net/minecraft/Packet28.java
++++ b/main/java/net/minecraft/Packet28.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Entity;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -49,6 +51,7 @@ extends Packet {
+         this.field_6041_d = (int)(d3 * 8000.0);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_6040_a = dataInputStream.readInt();
+         this.field_6039_b = dataInputStream.readShort();
+@@ -56,6 +59,7 @@ extends Packet {
+         this.field_6041_d = dataInputStream.readShort();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.field_6040_a);
+         dataOutputStream.writeShort(this.field_6039_b);
+diff --git a/main/java/net/minecraft/Packet29DestroyEntity.java b/main/java/net/minecraft/Packet29DestroyEntity.java
+index bc99ef2..cfb33bc 100644
+--- a/main/java/net/minecraft/Packet29DestroyEntity.java
++++ b/main/java/net/minecraft/Packet29DestroyEntity.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -19,10 +21,12 @@ extends Packet {
+         this.entityId = n;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+     }
+diff --git a/main/java/net/minecraft/Packet2Handshake.java b/main/java/net/minecraft/Packet2Handshake.java
+index 4475ac8..ac24c18 100644
+--- a/main/java/net/minecraft/Packet2Handshake.java
++++ b/main/java/net/minecraft/Packet2Handshake.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -19,10 +21,12 @@ extends Packet {
+         this.username = string;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.username = dataInputStream.readUTF();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeUTF(this.username);
+     }
+diff --git a/main/java/net/minecraft/Packet30Entity.java b/main/java/net/minecraft/Packet30Entity.java
+index 7a82cdb..006a288 100644
+--- a/main/java/net/minecraft/Packet30Entity.java
++++ b/main/java/net/minecraft/Packet30Entity.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -25,10 +27,12 @@ extends Packet {
+         this.entityId = n;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+     }
+diff --git a/main/java/net/minecraft/Packet31RelEntityMove.java b/main/java/net/minecraft/Packet31RelEntityMove.java
+index 4d3faaf..c4147b5 100644
+--- a/main/java/net/minecraft/Packet31RelEntityMove.java
++++ b/main/java/net/minecraft/Packet31RelEntityMove.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Packet30Entity;
+ 
+ public class Packet31RelEntityMove
+@@ -19,6 +21,7 @@ extends Packet30Entity {
+         this.zPosition = by3;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         super.readPacketData(dataInputStream);
+         this.xPosition = dataInputStream.readByte();
+@@ -26,6 +29,7 @@ extends Packet30Entity {
+         this.zPosition = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         super.writePacketData(dataOutputStream);
+         dataOutputStream.writeByte(this.xPosition);
+diff --git a/main/java/net/minecraft/Packet32EntityLook.java b/main/java/net/minecraft/Packet32EntityLook.java
+index 4d06245..bb795de 100644
+--- a/main/java/net/minecraft/Packet32EntityLook.java
++++ b/main/java/net/minecraft/Packet32EntityLook.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Packet30Entity;
+ 
+ public class Packet32EntityLook
+@@ -20,12 +22,14 @@ extends Packet30Entity {
+         this.rotating = true;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         super.readPacketData(dataInputStream);
+         this.yaw = dataInputStream.readByte();
+         this.pitch = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         super.writePacketData(dataOutputStream);
+         dataOutputStream.writeByte(this.yaw);
+diff --git a/main/java/net/minecraft/Packet33RelEntityMoveLook.java b/main/java/net/minecraft/Packet33RelEntityMoveLook.java
+index b2961f5..8a40d07 100644
+--- a/main/java/net/minecraft/Packet33RelEntityMoveLook.java
++++ b/main/java/net/minecraft/Packet33RelEntityMoveLook.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Packet30Entity;
+ 
+ public class Packet33RelEntityMoveLook
+@@ -23,6 +25,7 @@ extends Packet30Entity {
+         this.rotating = true;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         super.readPacketData(dataInputStream);
+         this.xPosition = dataInputStream.readByte();
+@@ -32,6 +35,7 @@ extends Packet30Entity {
+         this.pitch = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         super.writePacketData(dataOutputStream);
+         dataOutputStream.writeByte(this.xPosition);
+diff --git a/main/java/net/minecraft/Packet34EntityTeleport.java b/main/java/net/minecraft/Packet34EntityTeleport.java
+index d477cf4..0a86648 100644
+--- a/main/java/net/minecraft/Packet34EntityTeleport.java
++++ b/main/java/net/minecraft/Packet34EntityTeleport.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Entity;
+ import net.minecraft.MathHelper;
+ import net.minecraft.NetHandler;
+@@ -40,6 +42,7 @@ extends Packet {
+         this.pitch = by2;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.entityId = dataInputStream.readInt();
+         this.xPosition = dataInputStream.readInt();
+@@ -49,6 +52,7 @@ extends Packet {
+         this.pitch = (byte)dataInputStream.read();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.entityId);
+         dataOutputStream.writeInt(this.xPosition);
+diff --git a/main/java/net/minecraft/Packet38.java b/main/java/net/minecraft/Packet38.java
+index 19484c2..aebdec1 100644
+--- a/main/java/net/minecraft/Packet38.java
++++ b/main/java/net/minecraft/Packet38.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -21,11 +23,13 @@ extends Packet {
+         this.field_9015_b = by;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_9016_a = dataInputStream.readInt();
+         this.field_9015_b = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.field_9016_a);
+         dataOutputStream.writeByte(this.field_9015_b);
+diff --git a/main/java/net/minecraft/Packet39.java b/main/java/net/minecraft/Packet39.java
+index bf3f2f9..9128d25 100644
+--- a/main/java/net/minecraft/Packet39.java
++++ b/main/java/net/minecraft/Packet39.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Entity;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -26,11 +28,13 @@ extends Packet {
+         return 8;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_6044_a = dataInputStream.readInt();
+         this.field_6043_b = dataInputStream.readInt();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.field_6044_a);
+         dataOutputStream.writeInt(this.field_6043_b);
+diff --git a/main/java/net/minecraft/Packet3Chat.java b/main/java/net/minecraft/Packet3Chat.java
+index d3d667e..e1d8e15 100644
+--- a/main/java/net/minecraft/Packet3Chat.java
++++ b/main/java/net/minecraft/Packet3Chat.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -19,10 +21,12 @@ extends Packet {
+         this.message = string;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.message = dataInputStream.readUTF();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeUTF(this.message);
+     }
+diff --git a/main/java/net/minecraft/Packet4UpdateTime.java b/main/java/net/minecraft/Packet4UpdateTime.java
+index 15a32c1..683796f 100644
+--- a/main/java/net/minecraft/Packet4UpdateTime.java
++++ b/main/java/net/minecraft/Packet4UpdateTime.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -19,10 +21,12 @@ extends Packet {
+         this.time = l;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.time = dataInputStream.readLong();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeLong(this.time);
+     }
+diff --git a/main/java/net/minecraft/Packet50PreChunk.java b/main/java/net/minecraft/Packet50PreChunk.java
+index df90a97..74bd937 100644
+--- a/main/java/net/minecraft/Packet50PreChunk.java
++++ b/main/java/net/minecraft/Packet50PreChunk.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -25,12 +27,14 @@ extends Packet {
+         this.mode = bl;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readInt();
+         this.yPosition = dataInputStream.readInt();
+         this.mode = dataInputStream.read() != 0;
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.xPosition);
+         dataOutputStream.writeInt(this.yPosition);
+diff --git a/main/java/net/minecraft/Packet51MapChunk.java b/main/java/net/minecraft/Packet51MapChunk.java
+index 946ff07..1fd49f7 100644
+--- a/main/java/net/minecraft/Packet51MapChunk.java
++++ b/main/java/net/minecraft/Packet51MapChunk.java
+@@ -9,6 +9,8 @@ import java.io.IOException;
+ import java.util.zip.DataFormatException;
+ import java.util.zip.Deflater;
+ import java.util.zip.Inflater;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ import net.minecraft.World;
+@@ -52,6 +54,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readInt();
+         this.yPosition = dataInputStream.readShort();
+@@ -76,6 +79,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.xPosition);
+         dataOutputStream.writeShort(this.yPosition);
+diff --git a/main/java/net/minecraft/Packet52MultiBlockChange.java b/main/java/net/minecraft/Packet52MultiBlockChange.java
+index b11f6d0..342aa51 100644
+--- a/main/java/net/minecraft/Packet52MultiBlockChange.java
++++ b/main/java/net/minecraft/Packet52MultiBlockChange.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.Chunk;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -42,6 +44,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readInt();
+         this.zPosition = dataInputStream.readInt();
+@@ -56,6 +59,7 @@ extends Packet {
+         dataInputStream.readFully(this.metadataArray);
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.xPosition);
+         dataOutputStream.writeInt(this.zPosition);
+diff --git a/main/java/net/minecraft/Packet53BlockChange.java b/main/java/net/minecraft/Packet53BlockChange.java
+index 903661c..ed2ac14 100644
+--- a/main/java/net/minecraft/Packet53BlockChange.java
++++ b/main/java/net/minecraft/Packet53BlockChange.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ import net.minecraft.World;
+@@ -30,6 +32,7 @@ extends Packet {
+         this.metadata = world.getBlockMetadata(n, n2, n3);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readInt();
+         this.yPosition = dataInputStream.read();
+@@ -38,6 +41,7 @@ extends Packet {
+         this.metadata = dataInputStream.read();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.xPosition);
+         dataOutputStream.write(this.yPosition);
+diff --git a/main/java/net/minecraft/Packet5PlayerInventory.java b/main/java/net/minecraft/Packet5PlayerInventory.java
+index 38d06f5..ff5be73 100644
+--- a/main/java/net/minecraft/Packet5PlayerInventory.java
++++ b/main/java/net/minecraft/Packet5PlayerInventory.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -23,12 +25,14 @@ extends Packet {
+         this.field_20028_c = n3;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.type = dataInputStream.readInt();
+         this.stacks = dataInputStream.readShort();
+         this.field_20028_c = dataInputStream.readShort();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.type);
+         dataOutputStream.writeShort(this.stacks);
+diff --git a/main/java/net/minecraft/Packet60.java b/main/java/net/minecraft/Packet60.java
+index 68e8538..0dca0ae 100644
+--- a/main/java/net/minecraft/Packet60.java
++++ b/main/java/net/minecraft/Packet60.java
+@@ -7,6 +7,8 @@ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
+ import java.util.HashSet;
+ import java.util.Set;
++
++import lombok.SneakyThrows;
+ import net.minecraft.ChunkPosition;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+@@ -17,19 +19,20 @@ extends Packet {
+     public double field_12002_b;
+     public double field_12006_c;
+     public float field_12005_d;
+-    public Set field_12004_e;
++    public Set<ChunkPosition> field_12004_e;
+ 
+     public Packet60() {
+     }
+ 
+-    public Packet60(double d, double d2, double d3, float f, Set set) {
++    public Packet60(double d, double d2, double d3, float f, Set<ChunkPosition> set) {
+         this.field_12003_a = d;
+         this.field_12002_b = d2;
+         this.field_12006_c = d3;
+         this.field_12005_d = f;
+-        this.field_12004_e = new HashSet(set);
++        this.field_12004_e = new HashSet<>(set);
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_12003_a = dataInputStream.readDouble();
+         this.field_12002_b = dataInputStream.readDouble();
+@@ -48,6 +51,7 @@ extends Packet {
+         }
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeDouble(this.field_12003_a);
+         dataOutputStream.writeDouble(this.field_12002_b);
+diff --git a/main/java/net/minecraft/Packet6SpawnPosition.java b/main/java/net/minecraft/Packet6SpawnPosition.java
+index 79c4142..c923911 100644
+--- a/main/java/net/minecraft/Packet6SpawnPosition.java
++++ b/main/java/net/minecraft/Packet6SpawnPosition.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -23,12 +25,14 @@ extends Packet {
+         this.zPosition = n3;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.xPosition = dataInputStream.readInt();
+         this.yPosition = dataInputStream.readInt();
+         this.zPosition = dataInputStream.readInt();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.xPosition);
+         dataOutputStream.writeInt(this.yPosition);
+diff --git a/main/java/net/minecraft/Packet7.java b/main/java/net/minecraft/Packet7.java
+index 93a79cc..1135ef8 100644
+--- a/main/java/net/minecraft/Packet7.java
++++ b/main/java/net/minecraft/Packet7.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -14,12 +16,14 @@ extends Packet {
+     public int prevHealth;
+     public int field_9020_c;
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_9019_a = dataInputStream.readInt();
+         this.prevHealth = dataInputStream.readInt();
+         this.field_9020_c = dataInputStream.readByte();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeInt(this.field_9019_a);
+         dataOutputStream.writeInt(this.prevHealth);
+diff --git a/main/java/net/minecraft/Packet8.java b/main/java/net/minecraft/Packet8.java
+index 3a428e1..de40def 100644
+--- a/main/java/net/minecraft/Packet8.java
++++ b/main/java/net/minecraft/Packet8.java
+@@ -5,6 +5,8 @@ package net.minecraft;
+ 
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
++
++import lombok.SneakyThrows;
+ import net.minecraft.NetHandler;
+ import net.minecraft.Packet;
+ 
+@@ -19,10 +21,12 @@ extends Packet {
+         this.field_9017_a = n;
+     }
+ 
++    @SneakyThrows
+     public void readPacketData(DataInputStream dataInputStream) {
+         this.field_9017_a = dataInputStream.readShort();
+     }
+ 
++    @SneakyThrows
+     public void writePacketData(DataOutputStream dataOutputStream) {
+         dataOutputStream.writeShort(this.field_9017_a);
+     }
+diff --git a/main/java/net/minecraft/RecipeSorter.java b/main/java/net/minecraft/RecipeSorter.java
+index bfa8b33..ee2c2eb 100644
+--- a/main/java/net/minecraft/RecipeSorter.java
++++ b/main/java/net/minecraft/RecipeSorter.java
+@@ -24,5 +24,12 @@ implements Comparator {
+         }
+         return 0;
+     }
++
++    @Override
++    public int compare(Object o1, Object o2) {
++        if (o1 instanceof CraftingRecipe craftingRecipe && o2 instanceof CraftingRecipe craftingRecipe2)
++            return func_20107_a(craftingRecipe, craftingRecipe2);
++        else return -1;
++    }
+ }
+ 
+diff --git a/main/java/net/minecraft/ServerConfigurationManager.java b/main/java/net/minecraft/ServerConfigurationManager.java
+index cd9ac37..ebe4aeb 100644
+--- a/main/java/net/minecraft/ServerConfigurationManager.java
++++ b/main/java/net/minecraft/ServerConfigurationManager.java
+@@ -31,9 +31,9 @@ public class ServerConfigurationManager {
+     private MinecraftServer mcServer;
+     private PlayerManager playerManagerObj;
+     private int maxPlayers;
+-    private Set field_9252_f = new HashSet();
+-    private Set bannedIPs = new HashSet();
+-    private Set ops = new HashSet();
++    private Set<String> field_9252_f = new HashSet<>();
++    private Set<String> bannedIPs = new HashSet<>();
++    private Set<String> ops = new HashSet<>();
+     private File bannedPlayersFile;
+     private File ipBanFile;
+     private File opFile;
+diff --git a/main/java/net/minecraft/SlotArmor.java b/main/java/net/minecraft/SlotArmor.java
+index 9f19c8e..3e35f71 100644
+--- a/main/java/net/minecraft/SlotArmor.java
++++ b/main/java/net/minecraft/SlotArmor.java
+@@ -16,9 +16,9 @@ extends Slot {
+     final /* synthetic */ CraftingInventoryPlayerCB field_20101_b;
+ 
+     SlotArmor(CraftingInventoryPlayerCB craftingInventoryPlayerCB, IInventory iInventory, int n, int n2, int n3, int n4) {
++        super(iInventory, n, n2, n3);
+         this.field_20101_b = craftingInventoryPlayerCB;
+         this.field_20102_a = n4;
+-        super(iInventory, n, n2, n3);
+     }
+ 
+     public int func_20093_a() {
+diff --git a/main/java/net/minecraft/SpawnerAnimals.java b/main/java/net/minecraft/SpawnerAnimals.java
+index a6c4c32..ec5e715 100644
+--- a/main/java/net/minecraft/SpawnerAnimals.java
++++ b/main/java/net/minecraft/SpawnerAnimals.java
+@@ -18,7 +18,7 @@ import net.minecraft.MobSpawnerBase;
+ import net.minecraft.World;
+ 
+ public final class SpawnerAnimals {
+-    private static Set eligibleChunksForSpawning = new HashSet();
++    private static Set<ChunkCoordIntPair> eligibleChunksForSpawning = new HashSet<>();
+ 
+     protected static ChunkPosition getRandomSpawningPointInChunk(World world, int n, int n2) {
+         int n3 = n + world.rand.nextInt(16);
+@@ -44,7 +44,7 @@ public final class SpawnerAnimals {
+         n = 0;
+         for (int i = 0; i < EnumCreatureType.values().length; ++i) {
+             EnumCreatureType enumCreatureType = EnumCreatureType.values()[i];
+-            if (world.countEntities(enumCreatureType.field_4221_c) > enumCreatureType.maxNumberOfEntityType * eligibleChunksForSpawning.size() / 256) continue;
++            if (world.countEntities(enumCreatureType.creatureClass) > enumCreatureType.maxNumberOfEntityType * eligibleChunksForSpawning.size() / 256) continue;
+             block6: for (ChunkCoordIntPair chunkCoordIntPair : eligibleChunksForSpawning) {
+                 MobSpawnerBase mobSpawnerBase;
+                 Class[] classArray;
+diff --git a/main/java/net/minecraft/ThreadServerApplication.java b/main/java/net/minecraft/ThreadServerApplication.java
+index 9e3451b..1fc32cb 100644
+--- a/main/java/net/minecraft/ThreadServerApplication.java
++++ b/main/java/net/minecraft/ThreadServerApplication.java
+@@ -10,8 +10,8 @@ extends Thread {
+     final /* synthetic */ MinecraftServer mcServer;
+ 
+     public ThreadServerApplication(String string, MinecraftServer minecraftServer) {
+-        this.mcServer = minecraftServer;
+         super(string);
++        this.mcServer = minecraftServer;
+     }
+ 
+     public void run() {
+diff --git a/main/java/net/minecraft/ThreadSleepForever.java b/main/java/net/minecraft/ThreadSleepForever.java
+index 1496a1f..2ddfe34 100644
+--- a/main/java/net/minecraft/ThreadSleepForever.java
++++ b/main/java/net/minecraft/ThreadSleepForever.java
+@@ -18,14 +18,12 @@ extends Thread {
+     public void run() {
+         while (true) {
+             try {
+-                while (true) {
+-                    Thread.sleep(Integer.MAX_VALUE);
+-                }
++                Thread.sleep(Integer.MAX_VALUE);
+             }
+             catch (InterruptedException interruptedException) {
+                 continue;
+             }
+-            break;
++            // break; // FIXME: decompiler issue?
+         }
+     }
+ }
+diff --git a/main/java/net/minecraft/World.java b/main/java/net/minecraft/World.java
+index 4d82d70..b1db2cb 100644
+--- a/main/java/net/minecraft/World.java
++++ b/main/java/net/minecraft/World.java
+@@ -54,10 +54,10 @@ implements IBlockAccess {
+     private List field_821_y = new ArrayList();
+     public List loadedEntityList = new ArrayList();
+     private List field_790_z = new ArrayList();
+-    private TreeSet scheduledTickTreeSet = new TreeSet();
+-    private Set scheduledTickSet = new HashSet();
++    private TreeSet<NextTickListEntry> scheduledTickTreeSet = new TreeSet<>();
++    private Set<NextTickListEntry> scheduledTickSet = new HashSet<>();
+     public List loadedTileEntityList = new ArrayList();
+-    public List playerEntities = new ArrayList();
++    public List<EntityPlayer> playerEntities = new ArrayList<>();
+     public long worldTime = 0L;
+     private long field_6159_E = 0xFFFFFFL;
+     public int skylightSubtracted = 0;
+@@ -98,33 +98,31 @@ implements IBlockAccess {
+      * WARNING - Removed try catching itself - possible behaviour change.
+      */
+     public World(File file, String string, long l, WorldProvider worldProvider) {
+-        Object object;
+-        Object object2;
+         this.field_9211_s = file;
+         this.field_9210_w = string;
+         file.mkdirs();
+         this.field_797_s = new File(file, string);
+         this.field_797_s.mkdirs();
+         try {
+-            object2 = new File(this.field_797_s, "session.lock");
+-            object = new DataOutputStream(new FileOutputStream((File)object2));
++            File fileLock = new File(this.field_797_s, "session.lock");
++            DataOutputStream dos = new DataOutputStream(new FileOutputStream(fileLock));
+             try {
+-                ((DataOutputStream)object).writeLong(this.field_784_F);
++                dos.writeLong(this.field_784_F);
+             }
+             finally {
+-                ((FilterOutputStream)object).close();
++                dos.close();
+             }
+         }
+         catch (IOException iOException) {
+             iOException.printStackTrace();
+             throw new RuntimeException("Failed to check session lock, aborting");
+         }
+-        object2 = new WorldProvider();
+-        object = new File(this.field_797_s, "level.dat");
+-        boolean bl = this.field_9212_p = !((File)object).exists();
+-        if (((File)object).exists()) {
++        // WorldProvider worldProvider = new WorldProvider();
++        File levelDat = new File(this.field_797_s, "level.dat");
++        boolean bl = this.field_9212_p = !((File)levelDat).exists();
++        if (((File)levelDat).exists()) {
+             try {
+-                NBTTagCompound nBTTagCompound = CompressedStreamTools.func_770_a(new FileInputStream((File)object));
++                NBTTagCompound nBTTagCompound = CompressedStreamTools.func_770_a(new FileInputStream((File)levelDat));
+                 NBTTagCompound nBTTagCompound2 = nBTTagCompound.getCompoundTag("Data");
+                 this.randomSeed = nBTTagCompound2.getLong("RandomSeed");
+                 this.spawnX = nBTTagCompound2.getInteger("SpawnX");
+@@ -136,7 +134,7 @@ implements IBlockAccess {
+                     this.nbtCompoundPlayer = nBTTagCompound2.getCompoundTag("Player");
+                     int n = this.nbtCompoundPlayer.getInteger("Dimension");
+                     if (n == -1) {
+-                        object2 = new WorldProviderHell();
++                        worldProvider = new WorldProviderHell();
+                     }
+                 }
+             }
+@@ -145,14 +143,14 @@ implements IBlockAccess {
+             }
+         }
+         if (worldProvider != null) {
+-            object2 = worldProvider;
++            worldProvider = worldProvider;
+         }
+         boolean bl2 = false;
+         if (this.randomSeed == 0L) {
+             this.randomSeed = l;
+             bl2 = true;
+         }
+-        this.worldProvider = object2;
++        this.worldProvider = worldProvider;
+         this.worldProvider.registerWorld(this);
+         this.chunkProvider = this.func_4076_a(this.field_797_s);
+         if (bl2) {
+@@ -701,8 +699,8 @@ implements IBlockAccess {
+             bl = true;
+         }
+         if (bl || this.chunkExists(n, n2)) {
+-            if (entity instanceof EntityPlayer) {
+-                this.playerEntities.add((EntityPlayer)entity);
++            if (entity instanceof EntityPlayer player) {
++                this.playerEntities.add(player);
+                 System.out.println("Player count: " + this.playerEntities.size());
+             }
+             this.getChunkFromChunkCoords(n, n2).addEntity(entity);
+diff --git a/main/java/net/minecraft/WorldGenLightStone1.java b/main/java/net/minecraft/WorldGenLightStone1.java
+index ff7790a..a63daf3 100644
+--- a/main/java/net/minecraft/WorldGenLightStone1.java
++++ b/main/java/net/minecraft/WorldGenLightStone1.java
+@@ -11,6 +11,7 @@ import net.minecraft.WorldGenerator;
+ public class WorldGenLightStone1
+ extends WorldGenerator {
+     public boolean generate(World world, Random random, int n, int n2, int n3) {
++        System.out.println("WORLDGENLIGHTSTONE1");
+         if (!world.func_20111_e(n, n2, n3)) {
+             return false;
+         }
+@@ -47,7 +48,7 @@ extends WorldGenerator {
+                 if (n8 != Block.lightStone.blockID) continue;
+                 ++n7;
+             }
+-            if (n7 != true) continue;
++            // if (n7 != true) continue; // FIXME: decompiler issue
+             world.setBlockWithNotify(n6, n5, n4, Block.lightStone.blockID);
+         }
+         return true;
+diff --git a/main/java/net/minecraft/WorldGenLightStone2.java b/main/java/net/minecraft/WorldGenLightStone2.java
+index f8d1217..fd13b57 100644
+--- a/main/java/net/minecraft/WorldGenLightStone2.java
++++ b/main/java/net/minecraft/WorldGenLightStone2.java
+@@ -11,6 +11,7 @@ import net.minecraft.WorldGenerator;
+ public class WorldGenLightStone2
+ extends WorldGenerator {
+     public boolean generate(World world, Random random, int n, int n2, int n3) {
++        System.out.println("WORLDGENLIGHTSTONE2");
+         if (!world.func_20111_e(n, n2, n3)) {
+             return false;
+         }
+@@ -47,7 +48,7 @@ extends WorldGenerator {
+                 if (n8 != Block.lightStone.blockID) continue;
+                 ++n7;
+             }
+-            if (n7 != true) continue;
++            // if (n7 != 1) continue; // FIXME: decompiler issue
+             world.setBlockWithNotify(n6, n5, n4, Block.lightStone.blockID);
+         }
+         return true;
+diff --git a/main/java/net/minecraft/WorldServer.java b/main/java/net/minecraft/WorldServer.java
+index 5823a3f..131e30d 100644
+--- a/main/java/net/minecraft/WorldServer.java
++++ b/main/java/net/minecraft/WorldServer.java
+@@ -57,7 +57,7 @@ extends World {
+         return this.field_821_y;
+     }
+ 
+-    public List func_532_d(int n, int n2, int n3, int n4, int n5, int n6) {
++    public List<TileEntity> func_532_d(int n, int n2, int n3, int n4, int n5, int n6) {
+         ArrayList<TileEntity> arrayList = new ArrayList<TileEntity>();
+         for (int i = 0; i < this.loadedTileEntityList.size(); ++i) {
+             TileEntity tileEntity = (TileEntity)this.loadedTileEntityList.get(i);
+diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
+index e921884..f17cc3c 100644
+--- a/main/java/net/minecraft/server/MinecraftServer.java
++++ b/main/java/net/minecraft/server/MinecraftServer.java
+@@ -7,6 +7,7 @@ import java.awt.GraphicsEnvironment;
+ import java.io.File;
+ import java.io.IOException;
+ import java.net.InetAddress;
++import java.net.UnknownHostException;
+ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.HashMap;
+@@ -78,7 +79,12 @@ Runnable {
+         this.field_9011_n = this.propertyManagerObj.getBooleanProperty("pvp", true);
+         InetAddress inetAddress = null;
+         if (string.length() > 0) {
+-            inetAddress = InetAddress.getByName(string);
++            try {
++                inetAddress = InetAddress.getByName(string);
++            } catch(UnknownHostException e) {
++                logger.warning("**** FAILED TO BIND TO HOST!");
++                logger.log(Level.WARNING, "The exception was: " + e.toString());
++            }
+         }
+         int n = this.propertyManagerObj.getIntProperty("server-port", 25565);
+         logger.info("Starting Minecraft server on " + (string.length() == 0 ? "*" : string) + ":" + n);
+@@ -217,13 +223,13 @@ Runnable {
+     private void func_6018_h() {
+         int n;
+         ArrayList<String> arrayList = new ArrayList<String>();
+-        for (String string : field_6037_b.keySet()) {
++        for (Object string : field_6037_b.keySet()) {
+             int n2 = (Integer)field_6037_b.get(string);
+             if (n2 > 0) {
+                 field_6037_b.put(string, n2 - 1);
+                 continue;
+             }
+-            arrayList.add(string);
++            arrayList.add((String) string);
+         }
+         for (n = 0; n < arrayList.size(); ++n) {
+             field_6037_b.remove(arrayList.get(n));
+@@ -259,7 +265,6 @@ Runnable {
+     public void commandLineParser() {
+         while (this.commands.size() > 0) {
+             Object object;
+-            String[] stringArray;
+             ServerCommand serverCommand = (ServerCommand)this.commands.remove(0);
+             String string = serverCommand.command;
+             ICommandListener iCommandListener = serverCommand.commandListener;
+@@ -287,162 +292,165 @@ Runnable {
+                 iCommandListener.log("   say <message>             broadcasts a message to all players");
+                 continue;
+             }
+-            if (string.toLowerCase().startsWith("list")) {
++            else if (string.toLowerCase().startsWith("list")) {
+                 iCommandListener.log("Connected players: " + this.configManager.getPlayerList());
+                 continue;
+             }
+-            if (string.toLowerCase().startsWith("stop")) {
++            else if (string.toLowerCase().startsWith("stop")) {
+                 this.func_6014_a(string2, "Stopping the server..");
+                 this.field_6025_n = false;
+                 continue;
+             }
+-            if (string.toLowerCase().startsWith("save-all")) {
++            else if (string.toLowerCase().startsWith("save-all")) {
+                 this.func_6014_a(string2, "Forcing save..");
+                 this.worldMngr.saveWorld(true, null);
+                 this.func_6014_a(string2, "Save complete.");
+                 continue;
+             }
+-            if (string.toLowerCase().startsWith("save-off")) {
++            else if (string.toLowerCase().startsWith("save-off")) {
+                 this.func_6014_a(string2, "Disabling level saving..");
+                 this.worldMngr.field_816_A = true;
+                 continue;
+             }
+-            if (string.toLowerCase().startsWith("save-on")) {
++            else if (string.toLowerCase().startsWith("save-on")) {
+                 this.func_6014_a(string2, "Enabling level saving..");
+                 this.worldMngr.field_816_A = false;
+                 continue;
+-            }
+-            if (string.toLowerCase().startsWith("op ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                this.configManager.opPlayer((String)stringArray);
+-                this.func_6014_a(string2, "Opping " + (String)stringArray);
+-                this.configManager.sendChatMessageToPlayer((String)stringArray, "\u00a7eYou are now op!");
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("deop ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                this.configManager.deopPlayer((String)stringArray);
+-                this.configManager.sendChatMessageToPlayer((String)stringArray, "\u00a7eYou are no longer op!");
+-                this.func_6014_a(string2, "De-opping " + (String)stringArray);
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("ban-ip ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                this.configManager.banIP((String)stringArray);
+-                this.func_6014_a(string2, "Banning ip " + (String)stringArray);
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("pardon-ip ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                this.configManager.unbanIP((String)stringArray);
+-                this.func_6014_a(string2, "Pardoning ip " + (String)stringArray);
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("ban ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                this.configManager.banPlayer((String)stringArray);
+-                this.func_6014_a(string2, "Banning " + (String)stringArray);
+-                object = this.configManager.getPlayerEntity((String)stringArray);
+-                if (object == null) continue;
+-                ((EntityPlayerMP)object).field_421_a.func_43_c("Banned by admin");
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("pardon ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                this.configManager.unbanPlayer((String)stringArray);
+-                this.func_6014_a(string2, "Pardoning " + (String)stringArray);
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("kick ")) {
+-                stringArray = string.substring(string.indexOf(" ")).trim();
+-                object = null;
+-                for (int i = 0; i < this.configManager.playerEntities.size(); ++i) {
+-                    EntityPlayerMP entityPlayerMP = (EntityPlayerMP)this.configManager.playerEntities.get(i);
+-                    if (!entityPlayerMP.username.equalsIgnoreCase((String)stringArray)) continue;
+-                    object = entityPlayerMP;
++            } else {
++                String arg;
++                if (string.toLowerCase().startsWith("op ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    this.configManager.opPlayer((String)arg);
++                    this.func_6014_a(string2, "Opping " + (String)arg);
++                    this.configManager.sendChatMessageToPlayer((String)arg, "\u00a7eYou are now op!");
++                    continue;
+                 }
+-                if (object != null) {
+-                    ((EntityPlayerMP)object).field_421_a.func_43_c("Kicked by admin");
+-                    this.func_6014_a(string2, "Kicking " + ((EntityPlayerMP)object).username);
++                if (string.toLowerCase().startsWith("deop ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    this.configManager.deopPlayer((String)arg);
++                    this.configManager.sendChatMessageToPlayer((String)arg, "\u00a7eYou are no longer op!");
++                    this.func_6014_a(string2, "De-opping " + (String)arg);
+                     continue;
+                 }
+-                iCommandListener.log("Can't find user " + (String)stringArray + ". No kick.");
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("tp ")) {
+-                stringArray = string.split(" ");
+-                if (stringArray.length == 3) {
+-                    object = this.configManager.getPlayerEntity(stringArray[1]);
+-                    EntityPlayerMP entityPlayerMP = this.configManager.getPlayerEntity(stringArray[2]);
+-                    if (object == null) {
+-                        iCommandListener.log("Can't find user " + stringArray[1] + ". No tp.");
+-                        continue;
++                if (string.toLowerCase().startsWith("ban-ip ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    this.configManager.banIP((String)arg);
++                    this.func_6014_a(string2, "Banning ip " + (String)arg);
++                    continue;
++                }
++                if (string.toLowerCase().startsWith("pardon-ip ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    this.configManager.unbanIP((String)arg);
++                    this.func_6014_a(string2, "Pardoning ip " + (String)arg);
++                    continue;
++                }
++                if (string.toLowerCase().startsWith("ban ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    this.configManager.banPlayer((String)arg);
++                    this.func_6014_a(string2, "Banning " + (String)arg);
++                    object = this.configManager.getPlayerEntity((String)arg);
++                    if (object == null) continue;
++                    ((EntityPlayerMP)object).field_421_a.func_43_c("Banned by admin");
++                    continue;
++                }
++                if (string.toLowerCase().startsWith("pardon ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    this.configManager.unbanPlayer((String)arg);
++                    this.func_6014_a(string2, "Pardoning " + (String)arg);
++                    continue;
++                }
++                if (string.toLowerCase().startsWith("kick ")) {
++                    arg = string.substring(string.indexOf(" ")).trim();
++                    object = null;
++                    for (int i = 0; i < this.configManager.playerEntities.size(); ++i) {
++                        EntityPlayerMP entityPlayerMP = (EntityPlayerMP)this.configManager.playerEntities.get(i);
++                        if (!entityPlayerMP.username.equalsIgnoreCase((String)arg)) continue;
++                        object = entityPlayerMP;
+                     }
+-                    if (entityPlayerMP == null) {
+-                        iCommandListener.log("Can't find user " + stringArray[2] + ". No tp.");
++                    if (object != null) {
++                        ((EntityPlayerMP)object).field_421_a.func_43_c("Kicked by admin");
++                        this.func_6014_a(string2, "Kicking " + ((EntityPlayerMP)object).username);
+                         continue;
+                     }
+-                    ((EntityPlayerMP)object).field_421_a.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
+-                    this.func_6014_a(string2, "Teleporting " + stringArray[1] + " to " + stringArray[2] + ".");
++                    iCommandListener.log("Can't find user " + (String)arg + ". No kick.");
+                     continue;
+                 }
+-                iCommandListener.log("Syntax error, please provice a source and a target.");
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("give ")) {
+-                stringArray = string.split(" ");
+-                if (stringArray.length != 3 && stringArray.length != 4) {
+-                    return;
+-                }
+-                object = stringArray[1];
+-                EntityPlayerMP entityPlayerMP = this.configManager.getPlayerEntity((String)object);
+-                if (entityPlayerMP != null) {
+-                    try {
+-                        int n = Integer.parseInt(stringArray[2]);
+-                        if (Item.itemsList[n] != null) {
+-                            this.func_6014_a(string2, "Giving " + entityPlayerMP.username + " some " + n);
+-                            int n2 = 1;
+-                            if (stringArray.length > 3) {
+-                                n2 = this.func_6020_b(stringArray[3], 1);
+-                            }
+-                            if (n2 < 1) {
+-                                n2 = 1;
+-                            }
+-                            if (n2 > 64) {
+-                                n2 = 64;
+-                            }
+-                            entityPlayerMP.func_20044_b(new ItemStack(n, n2));
++                String[] stringArray;
++                if (string.toLowerCase().startsWith("tp ")) {
++                    stringArray = string.split(" ");
++                    if (stringArray.length == 3) {
++                        object = this.configManager.getPlayerEntity(stringArray[1]);
++                        EntityPlayerMP entityPlayerMP = this.configManager.getPlayerEntity(stringArray[2]);
++                        if (object == null) {
++                            iCommandListener.log("Can't find user " + stringArray[1] + ". No tp.");
++                            continue;
++                        }
++                        if (entityPlayerMP == null) {
++                            iCommandListener.log("Can't find user " + stringArray[2] + ". No tp.");
+                             continue;
+                         }
+-                        iCommandListener.log("There's no item with id " + n);
++                        ((EntityPlayerMP)object).field_421_a.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
++                        this.func_6014_a(string2, "Teleporting " + stringArray[1] + " to " + stringArray[2] + ".");
++                        continue;
+                     }
+-                    catch (NumberFormatException numberFormatException) {
+-                        iCommandListener.log("There's no item with id " + stringArray[2]);
++                    iCommandListener.log("Syntax error, please provice a source and a target.");
++                    continue;
++                }
++                if (string.toLowerCase().startsWith("give ")) {
++                    stringArray = string.split(" ");
++                    if (stringArray.length != 3 && stringArray.length != 4) {
++                        return;
+                     }
++                    object = stringArray[1];
++                    EntityPlayerMP entityPlayerMP = this.configManager.getPlayerEntity((String)object);
++                    if (entityPlayerMP != null) {
++                        try {
++                            int n = Integer.parseInt(stringArray[2]);
++                            if (Item.itemsList[n] != null) {
++                                this.func_6014_a(string2, "Giving " + entityPlayerMP.username + " some " + n);
++                                int n2 = 1;
++                                if (stringArray.length > 3) {
++                                    n2 = this.func_6020_b(stringArray[3], 1);
++                                }
++                                if (n2 < 1) {
++                                    n2 = 1;
++                                }
++                                if (n2 > 64) {
++                                    n2 = 64;
++                                }
++                                entityPlayerMP.func_20044_b(new ItemStack(n, n2));
++                                continue;
++                            }
++                            iCommandListener.log("There's no item with id " + n);
++                        }
++                        catch (NumberFormatException numberFormatException) {
++                            iCommandListener.log("There's no item with id " + stringArray[2]);
++                        }
++                        continue;
++                    }
++                    iCommandListener.log("Can't find user " + (String)object);
+                     continue;
+                 }
+-                iCommandListener.log("Can't find user " + (String)object);
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("say ")) {
+-                string = string.substring(string.indexOf(" ")).trim();
+-                logger.info("[" + string2 + "] " + string);
+-                this.configManager.sendPacketToAllPlayers(new Packet3Chat("\u00a7d[Server] " + string));
+-                continue;
+-            }
+-            if (string.toLowerCase().startsWith("tell ")) {
+-                stringArray = string.split(" ");
+-                if (stringArray.length < 3) continue;
+-                string = string.substring(string.indexOf(" ")).trim();
+-                string = string.substring(string.indexOf(" ")).trim();
+-                logger.info("[" + string2 + "->" + stringArray[1] + "] " + string);
+-                string = "\u00a77" + string2 + " whispers " + string;
+-                logger.info(string);
+-                if (this.configManager.sendPacketToPlayer(stringArray[1], new Packet3Chat(string))) continue;
+-                iCommandListener.log("There's no player by that name online.");
+-                continue;
++                if (string.toLowerCase().startsWith("say ")) {
++                    string = string.substring(string.indexOf(" ")).trim();
++                    logger.info("[" + string2 + "] " + string);
++                    this.configManager.sendPacketToAllPlayers(new Packet3Chat("\u00a7d[Server] " + string));
++                    continue;
++                }
++                if (string.toLowerCase().startsWith("tell ")) {
++                    stringArray = string.split(" ");
++                    if (stringArray.length < 3) continue;
++                    string = string.substring(string.indexOf(" ")).trim();
++                    string = string.substring(string.indexOf(" ")).trim();
++                    logger.info("[" + string2 + "->" + stringArray[1] + "] " + string);
++                    string = "\u00a77" + string2 + " whispers " + string;
++                    logger.info(string);
++                    if (this.configManager.sendPacketToPlayer(stringArray[1], new Packet3Chat(string))) continue;
++                    iCommandListener.log("There's no player by that name online.");
++                    continue;
++                }
++                logger.info("Unknown console command. Type \"help\" for help.");
+             }
+-            logger.info("Unknown console command. Type \"help\" for help.");
+         }
+     }
+ 
+-- 
+2.36.1
+
