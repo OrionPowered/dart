@@ -1,0 +1,923 @@
+From 3776c80a5d0e197f858a1857e86e0206f33be7c7 Mon Sep 17 00:00:00 2001
+From: Alex Sobiek <alex@alexsobiek.com>
+Date: Wed, 8 Jun 2022 04:15:04 -0500
+Subject: [PATCH 2/4] Mapped additional fields and methods
+
+---
+ main/java/net/minecraft/EntityPlayerMP.java   | 93 +++++++------------
+ .../net/minecraft/EntityTrackerEntry.java     | 86 ++++++-----------
+ main/java/net/minecraft/NetLoginHandler.java  | 24 ++---
+ main/java/net/minecraft/NetServerHandler.java | 64 ++++---------
+ .../net/minecraft/NetworkListenThread.java    |  7 +-
+ main/java/net/minecraft/PlayerInstance.java   | 16 +---
+ .../minecraft/ServerConfigurationManager.java | 29 ++----
+ .../net/minecraft/server/MinecraftServer.java | 18 ++--
+ 8 files changed, 106 insertions(+), 231 deletions(-)
+
+diff --git a/main/java/net/minecraft/EntityPlayerMP.java b/main/java/net/minecraft/EntityPlayerMP.java
+index 84fa3ef..37baad2 100644
+--- a/main/java/net/minecraft/EntityPlayerMP.java
++++ b/main/java/net/minecraft/EntityPlayerMP.java
+@@ -3,63 +3,32 @@
+  */
+ package net.minecraft;
+ 
++import net.minecraft.server.MinecraftServer;
++
+ import java.util.HashSet;
+ import java.util.LinkedList;
+ import java.util.List;
+ import java.util.Set;
+-import java.util.concurrent.CompletableFuture;
+-
+-import net.minecraft.ChunkCoordIntPair;
+-import net.minecraft.CraftingInventoryCB;
+-import net.minecraft.CraftingInventoryChestCB;
+-import net.minecraft.CraftingInventoryFurnaceCB;
+-import net.minecraft.CraftingInventoryWorkbenchCB;
+-import net.minecraft.Entity;
+-import net.minecraft.EntityArrow;
+-import net.minecraft.EntityItem;
+-import net.minecraft.EntityPlayer;
+-import net.minecraft.ICrafting;
+-import net.minecraft.IInventory;
+-import net.minecraft.ItemInWorldManager;
+-import net.minecraft.ItemStack;
+-import net.minecraft.NetServerHandler;
+-import net.minecraft.Packet;
+-import net.minecraft.Packet100;
+-import net.minecraft.Packet101;
+-import net.minecraft.Packet103;
+-import net.minecraft.Packet104;
+-import net.minecraft.Packet105;
+-import net.minecraft.Packet18ArmAnimation;
+-import net.minecraft.Packet22Collect;
+-import net.minecraft.Packet39;
+-import net.minecraft.Packet51MapChunk;
+-import net.minecraft.Packet5PlayerInventory;
+-import net.minecraft.Packet8;
+-import net.minecraft.SlotCrafting;
+-import net.minecraft.TileEntity;
+-import net.minecraft.TileEntityFurnace;
+-import net.minecraft.World;
+-import net.minecraft.server.MinecraftServer;
+ 
+ public class EntityPlayerMP
+-extends EntityPlayer
+-implements ICrafting {
+-    public NetServerHandler field_421_a;
++        extends EntityPlayer
++        implements ICrafting {
++    public NetServerHandler netServerHandler;
+     public MinecraftServer mcServer;
+     public ItemInWorldManager field_425_ad;
+     public double field_9155_d;
+     public double field_9154_e;
+     public List<ChunkCoordIntPair> loadedChunks = new LinkedList();
+-    public Set field_420_ah = new HashSet();
++    public Set<ChunkCoordIntPair> field_420_ah = new HashSet<>();
+     public double field_418_ai;
+-    public boolean field_12012_al = false;
++    public boolean sneaking = false;
+     private int field_9156_bu = -99999999;
+     private int field_15004_bw = 60;
+-    private int[] field_20066_bG = new int[]{-1, -1, -1, -1, -1};
++    private final int[] field_20066_bG = new int[]{-1, -1, -1, -1, -1};
+     private int field_20065_bH = 0;
+     public boolean field_20064_am;
+ 
+-    public EntityPlayerMP(MinecraftServer minecraftServer, World world, String string, ItemInWorldManager itemInWorldManager) {
++    public EntityPlayerMP(MinecraftServer minecraftServer, World world, String username, ItemInWorldManager itemInWorldManager) {
+         super(world);
+         int n = world.spawnX;
+         int n2 = world.spawnZ;
+@@ -68,11 +37,11 @@ implements ICrafting {
+             n3 = world.func_4075_e(n += this.rand.nextInt(20) - 10, n2);
+             n2 += this.rand.nextInt(20) - 10;
+         }
+-        this.setLocationAndAngles((double)n + 0.5, n3, (double)n2 + 0.5, 0.0f, 0.0f);
++        this.setLocationAndAngles((double) n + 0.5, n3, (double) n2 + 0.5, 0.0f, 0.0f);
+         this.mcServer = minecraftServer;
+         this.field_9067_S = 0.0f;
+         itemInWorldManager.field_675_a = this;
+-        this.username = string;
++        this.username = username;
+         this.field_425_ad = itemInWorldManager;
+         this.yOffset = 0.0f;
+     }
+@@ -123,7 +92,7 @@ implements ICrafting {
+                 return false;
+             }
+             if (entity instanceof EntityArrow) {
+-                EntityArrow entityArrow = (EntityArrow)entity;
++                EntityArrow entityArrow = (EntityArrow) entity;
+                 if (entityArrow.field_439_ah instanceof EntityPlayer) {
+                     return false;
+                 }
+@@ -136,7 +105,7 @@ implements ICrafting {
+         super.heal(n);
+     }
+ 
+-    public void func_175_i() {
++    public void sendChunks() {
+         int n;
+         super.onUpdate();
+         ChunkCoordIntPair chunkCoordIntPair = null;
+@@ -153,28 +122,28 @@ implements ICrafting {
+             if (d < 1024.0) {
+                 n = 1;
+             }
+-            if (this.field_421_a.func_38_b() < 2) {
++            if (this.netServerHandler.func_38_b() < 2) {
+                 n = 1;
+             }
+             if (n != 0) {
+                 this.loadedChunks.remove(chunkCoordIntPair);
+-                this.field_421_a.sendPacket(new Packet51MapChunk(chunkCoordIntPair.chunkXPos * 16, 0, chunkCoordIntPair.chunkZPos * 16, 16, 128, 16, this.mcServer.worldMngr));
++                this.netServerHandler.sendPacket(new Packet51MapChunk(chunkCoordIntPair.chunkXPos * 16, 0, chunkCoordIntPair.chunkZPos * 16, 16, 128, 16, this.mcServer.worldMngr));
+                 List<TileEntity> entities = this.mcServer.worldMngr.func_532_d(chunkCoordIntPair.chunkXPos * 16, 0, chunkCoordIntPair.chunkZPos * 16, chunkCoordIntPair.chunkXPos * 16 + 16, 128, chunkCoordIntPair.chunkZPos * 16 + 16);
+                 for (int i = 0; i < entities.size(); ++i) {
+-                    this.func_20063_a((TileEntity)entities.get(i));
++                    this.sendTileEntity(entities.get(i));
+                 }
+             }
+         }
+         if (this.health != this.field_9156_bu) {
+-            this.field_421_a.sendPacket(new Packet8(this.health));
++            this.netServerHandler.sendPacket(new Packet8(this.health));
+             this.field_9156_bu = this.health;
+         }
+     }
+ 
+-    private void func_20063_a(TileEntity tileEntity) {
++    private void sendTileEntity(TileEntity tileEntity) {
+         Packet packet;
+         if (tileEntity != null && (packet = tileEntity.func_20070_f()) != null) {
+-            this.field_421_a.sendPacket(packet);
++            this.netServerHandler.sendPacket(packet);
+         }
+     }
+ 
+@@ -213,8 +182,8 @@ implements ICrafting {
+ 
+     public void mountEntity(Entity entity) {
+         super.mountEntity(entity);
+-        this.field_421_a.sendPacket(new Packet39(this, this.ridingEntity));
+-        this.field_421_a.func_41_a(this.posX, this.posY, this.posZ, this.rotationYaw, this.rotationPitch);
++        this.netServerHandler.sendPacket(new Packet39(this, this.ridingEntity));
++        this.netServerHandler.func_41_a(this.posX, this.posY, this.posZ, this.rotationYaw, this.rotationPitch);
+     }
+ 
+     protected void updateFallState(double d, boolean bl) {
+@@ -225,7 +194,7 @@ implements ICrafting {
+     }
+ 
+     public boolean isSneaking() {
+-        return this.field_12012_al;
++        return this.sneaking;
+     }
+ 
+     private void func_20060_R() {
+@@ -234,7 +203,7 @@ implements ICrafting {
+ 
+     public void func_174_A(int n, int n2, int n3) {
+         this.func_20060_R();
+-        this.field_421_a.sendPacket(new Packet100(this.field_20065_bH, 1, "Crafting", 9));
++        this.netServerHandler.sendPacket(new Packet100(this.field_20065_bH, 1, "Crafting", 9));
+         this.field_20052_ap = new CraftingInventoryWorkbenchCB(this.inventory, this.worldObj, n, n2, n3);
+         this.field_20052_ap.field_20134_f = this.field_20065_bH;
+         this.field_20052_ap.func_20128_a(this);
+@@ -242,7 +211,7 @@ implements ICrafting {
+ 
+     public void func_166_a(IInventory iInventory) {
+         this.func_20060_R();
+-        this.field_421_a.sendPacket(new Packet100(this.field_20065_bH, 0, iInventory.func_20068_b(), iInventory.getSizeInventory()));
++        this.netServerHandler.sendPacket(new Packet100(this.field_20065_bH, 0, iInventory.func_20068_b(), iInventory.getSizeInventory()));
+         this.field_20052_ap = new CraftingInventoryChestCB(this.inventory, iInventory);
+         this.field_20052_ap.field_20134_f = this.field_20065_bH;
+         this.field_20052_ap.func_20128_a(this);
+@@ -250,7 +219,7 @@ implements ICrafting {
+ 
+     public void displayGUIFurnace(TileEntityFurnace tileEntityFurnace) {
+         this.func_20060_R();
+-        this.field_421_a.sendPacket(new Packet100(this.field_20065_bH, 2, tileEntityFurnace.func_20068_b(), tileEntityFurnace.getSizeInventory()));
++        this.netServerHandler.sendPacket(new Packet100(this.field_20065_bH, 2, tileEntityFurnace.func_20068_b(), tileEntityFurnace.getSizeInventory()));
+         this.field_20052_ap = new CraftingInventoryFurnaceCB(this.inventory, tileEntityFurnace);
+         this.field_20052_ap.field_20134_f = this.field_20065_bH;
+         this.field_20052_ap.func_20128_a(this);
+@@ -263,23 +232,23 @@ implements ICrafting {
+         if (this.field_20064_am) {
+             return;
+         }
+-        this.field_421_a.sendPacket(new Packet103(craftingInventoryCB.field_20134_f, n, itemStack));
++        this.netServerHandler.sendPacket(new Packet103(craftingInventoryCB.field_20134_f, n, itemStack));
+     }
+ 
+     public void func_20054_a(CraftingInventoryCB craftingInventoryCB, List list) {
+-        this.field_421_a.sendPacket(new Packet104(craftingInventoryCB.field_20134_f, list));
+-        this.field_421_a.sendPacket(new Packet103(-1, -1, this.inventory.func_20072_i()));
++        this.netServerHandler.sendPacket(new Packet104(craftingInventoryCB.field_20134_f, list));
++        this.netServerHandler.sendPacket(new Packet103(-1, -1, this.inventory.func_20072_i()));
+     }
+ 
+     public void func_20056_a(CraftingInventoryCB craftingInventoryCB, int n, int n2) {
+-        this.field_421_a.sendPacket(new Packet105(craftingInventoryCB.field_20134_f, n, n2));
++        this.netServerHandler.sendPacket(new Packet105(craftingInventoryCB.field_20134_f, n, n2));
+     }
+ 
+     public void func_20045_a(ItemStack itemStack) {
+     }
+ 
+     public void func_20043_I() {
+-        this.field_421_a.sendPacket(new Packet101(this.field_20052_ap.field_20134_f));
++        this.netServerHandler.sendPacket(new Packet101(this.field_20052_ap.field_20134_f));
+         this.func_20059_K();
+     }
+ 
+@@ -287,7 +256,7 @@ implements ICrafting {
+         if (this.field_20064_am) {
+             return;
+         }
+-        this.field_421_a.sendPacket(new Packet103(-1, -1, this.inventory.func_20072_i()));
++        this.netServerHandler.sendPacket(new Packet103(-1, -1, this.inventory.func_20072_i()));
+     }
+ 
+     public void func_20059_K() {
+diff --git a/main/java/net/minecraft/EntityTrackerEntry.java b/main/java/net/minecraft/EntityTrackerEntry.java
+index b08b9d8..cd50cce 100644
+--- a/main/java/net/minecraft/EntityTrackerEntry.java
++++ b/main/java/net/minecraft/EntityTrackerEntry.java
+@@ -6,36 +6,6 @@ package net.minecraft;
+ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Set;
+-import net.minecraft.Block;
+-import net.minecraft.Entity;
+-import net.minecraft.EntityArrow;
+-import net.minecraft.EntityBoat;
+-import net.minecraft.EntityEgg;
+-import net.minecraft.EntityFallingSand;
+-import net.minecraft.EntityFish;
+-import net.minecraft.EntityItem;
+-import net.minecraft.EntityLiving;
+-import net.minecraft.EntityMinecart;
+-import net.minecraft.EntityPlayer;
+-import net.minecraft.EntityPlayerMP;
+-import net.minecraft.EntitySnowball;
+-import net.minecraft.EntityTNTPrimed;
+-import net.minecraft.IAnimals;
+-import net.minecraft.MathHelper;
+-import net.minecraft.Packet;
+-import net.minecraft.Packet18ArmAnimation;
+-import net.minecraft.Packet20NamedEntitySpawn;
+-import net.minecraft.Packet21PickupSpawn;
+-import net.minecraft.Packet23VehicleSpawn;
+-import net.minecraft.Packet24MobSpawn;
+-import net.minecraft.Packet28;
+-import net.minecraft.Packet29DestroyEntity;
+-import net.minecraft.Packet30Entity;
+-import net.minecraft.Packet31RelEntityMove;
+-import net.minecraft.Packet32EntityLook;
+-import net.minecraft.Packet33RelEntityMoveLook;
+-import net.minecraft.Packet34EntityTeleport;
+-import net.minecraft.Packet5PlayerInventory;
+ 
+ public class EntityTrackerEntry {
+     public Entity field_909_a;
+@@ -57,7 +27,7 @@ public class EntityTrackerEntry {
+     private double field_9223_r;
+     private double field_9222_s;
+     private boolean field_12020_u = false;
+-    private boolean field_9220_u;
++    private final boolean field_9220_u;
+     public boolean field_900_j = false;
+     public Set<EntityPlayerMP> field_899_k = new HashSet<>();
+ 
+@@ -75,7 +45,7 @@ public class EntityTrackerEntry {
+ 
+     public boolean equals(Object object) {
+         if (object instanceof EntityTrackerEntry) {
+-            return ((EntityTrackerEntry)object).field_909_a.field_331_c == this.field_909_a.field_331_c;
++            return ((EntityTrackerEntry) object).field_909_a.field_331_c == this.field_909_a.field_331_c;
+         }
+         return false;
+     }
+@@ -111,7 +81,7 @@ public class EntityTrackerEntry {
+             int n7 = n2 - this.field_9232_g;
+             int n8 = n3 - this.field_9231_h;
+             Packet packet = null;
+-            packet = n6 < -128 || n6 >= 128 || n7 < -128 || n7 >= 128 || n8 < -128 || n8 >= 128 ? new Packet34EntityTeleport(this.field_909_a.field_331_c, n, n2, n3, (byte)n4, (byte)n5) : (bl && bl2 ? new Packet33RelEntityMoveLook(this.field_909_a.field_331_c, (byte)n6, (byte)n7, (byte)n8, (byte)n4, (byte)n5) : (bl ? new Packet31RelEntityMove(this.field_909_a.field_331_c, (byte)n6, (byte)n7, (byte)n8) : (bl2 ? new Packet32EntityLook(this.field_909_a.field_331_c, (byte)n4, (byte)n5) : new Packet30Entity(this.field_909_a.field_331_c))));
++            packet = n6 < -128 || n6 >= 128 || n7 < -128 || n7 >= 128 || n8 < -128 || n8 >= 128 ? new Packet34EntityTeleport(this.field_909_a.field_331_c, n, n2, n3, (byte) n4, (byte) n5) : (bl && bl2 ? new Packet33RelEntityMoveLook(this.field_909_a.field_331_c, (byte) n6, (byte) n7, (byte) n8, (byte) n4, (byte) n5) : (bl ? new Packet31RelEntityMove(this.field_909_a.field_331_c, (byte) n6, (byte) n7, (byte) n8) : (bl2 ? new Packet32EntityLook(this.field_909_a.field_331_c, (byte) n4, (byte) n5) : new Packet30Entity(this.field_909_a.field_331_c))));
+             if (this.field_9220_u && ((d5 = (d4 = this.field_909_a.motionX - this.field_9228_k) * d4 + (d3 = this.field_909_a.motionY - this.field_9227_l) * d3 + (d2 = this.field_909_a.motionZ - this.field_9226_m) * d2) > (d = 0.02) * d || d5 > 0.0 && this.field_909_a.motionX == 0.0 && this.field_909_a.motionY == 0.0 && this.field_909_a.motionZ == 0.0)) {
+                 this.field_9228_k = this.field_909_a.motionX;
+                 this.field_9227_l = this.field_909_a.motionY;
+@@ -158,14 +128,14 @@ public class EntityTrackerEntry {
+ 
+     public void func_603_a(Packet packet) {
+         for (EntityPlayerMP entityPlayerMP : this.field_899_k) {
+-            entityPlayerMP.field_421_a.sendPacket(packet);
++            entityPlayerMP.netServerHandler.sendPacket(packet);
+         }
+     }
+ 
+     public void func_12018_b(Packet packet) {
+         this.func_603_a(packet);
+         if (this.field_909_a instanceof EntityPlayerMP) {
+-            ((EntityPlayerMP)this.field_909_a).field_421_a.sendPacket(packet);
++            ((EntityPlayerMP) this.field_909_a).netServerHandler.sendPacket(packet);
+         }
+     }
+ 
+@@ -174,64 +144,62 @@ public class EntityTrackerEntry {
+     }
+ 
+     public void func_12019_a(EntityPlayerMP entityPlayerMP) {
+-        if (this.field_899_k.contains(entityPlayerMP)) {
+-            this.field_899_k.remove(entityPlayerMP);
+-        }
++        this.field_899_k.remove(entityPlayerMP);
+     }
+ 
+     public void func_606_a(EntityPlayerMP entityPlayerMP) {
+         if (entityPlayerMP == this.field_909_a) {
+             return;
+         }
+-        double d = entityPlayerMP.posX - (double)(this.field_9233_f / 32);
+-        double d2 = entityPlayerMP.posZ - (double)(this.field_9231_h / 32);
+-        if (d >= (double)(-this.field_9235_d) && d <= (double)this.field_9235_d && d2 >= (double)(-this.field_9235_d) && d2 <= (double)this.field_9235_d) {
++        double d = entityPlayerMP.posX - (double) (this.field_9233_f / 32);
++        double d2 = entityPlayerMP.posZ - (double) (this.field_9231_h / 32);
++        if (d >= (double) (-this.field_9235_d) && d <= (double) this.field_9235_d && d2 >= (double) (-this.field_9235_d) && d2 <= (double) this.field_9235_d) {
+             if (!this.field_899_k.contains(entityPlayerMP)) {
+                 int[] nArray;
+                 this.field_899_k.add(entityPlayerMP);
+-                entityPlayerMP.field_421_a.sendPacket(this.func_602_b());
++                entityPlayerMP.netServerHandler.sendPacket(this.func_602_b());
+                 if (this.field_9225_n) {
+-                    entityPlayerMP.field_421_a.sendPacket(new Packet18ArmAnimation(this.field_909_a, 104));
++                    entityPlayerMP.netServerHandler.sendPacket(new Packet18ArmAnimation(this.field_909_a, 104));
+                 }
+                 if (this.field_9237_b) {
+-                    entityPlayerMP.field_421_a.sendPacket(new Packet18ArmAnimation(this.field_909_a, 100));
++                    entityPlayerMP.netServerHandler.sendPacket(new Packet18ArmAnimation(this.field_909_a, 100));
+                 }
+                 if (this.field_9236_c) {
+-                    entityPlayerMP.field_421_a.sendPacket(new Packet18ArmAnimation(this.field_909_a, 102));
++                    entityPlayerMP.netServerHandler.sendPacket(new Packet18ArmAnimation(this.field_909_a, 102));
+                 }
+                 if (this.field_9220_u) {
+-                    entityPlayerMP.field_421_a.sendPacket(new Packet28(this.field_909_a.field_331_c, this.field_909_a.motionX, this.field_909_a.motionY, this.field_909_a.motionZ));
++                    entityPlayerMP.netServerHandler.sendPacket(new Packet28(this.field_909_a.field_331_c, this.field_909_a.motionX, this.field_909_a.motionY, this.field_909_a.motionZ));
+                 }
+                 if ((nArray = this.field_909_a.func_20042_E()) != null) {
+                     for (int i = 0; i < nArray.length; ++i) {
+-                        entityPlayerMP.field_421_a.sendPacket(new Packet5PlayerInventory(this.field_909_a.field_331_c, i, nArray[i]));
++                        entityPlayerMP.netServerHandler.sendPacket(new Packet5PlayerInventory(this.field_909_a.field_331_c, i, nArray[i]));
+                     }
+                 }
+             }
+         } else if (this.field_899_k.contains(entityPlayerMP)) {
+             this.field_899_k.remove(entityPlayerMP);
+-            entityPlayerMP.field_421_a.sendPacket(new Packet29DestroyEntity(this.field_909_a.field_331_c));
++            entityPlayerMP.netServerHandler.sendPacket(new Packet29DestroyEntity(this.field_909_a.field_331_c));
+         }
+     }
+ 
+     public void func_601_b(List list) {
+         for (int i = 0; i < list.size(); ++i) {
+-            this.func_606_a((EntityPlayerMP)list.get(i));
++            this.func_606_a((EntityPlayerMP) list.get(i));
+         }
+     }
+ 
+     private Packet func_602_b() {
+         Entity entity;
+         if (this.field_909_a instanceof EntityItem) {
+-            EntityItem entityItem = (EntityItem)this.field_909_a;
++            EntityItem entityItem = (EntityItem) this.field_909_a;
+             Packet21PickupSpawn packet21PickupSpawn = new Packet21PickupSpawn(entityItem);
+-            entityItem.posX = (double)packet21PickupSpawn.xPosition / 32.0;
+-            entityItem.posY = (double)packet21PickupSpawn.yPosition / 32.0;
+-            entityItem.posZ = (double)packet21PickupSpawn.zPosition / 32.0;
++            entityItem.posX = (double) packet21PickupSpawn.xPosition / 32.0;
++            entityItem.posY = (double) packet21PickupSpawn.yPosition / 32.0;
++            entityItem.posZ = (double) packet21PickupSpawn.zPosition / 32.0;
+             return packet21PickupSpawn;
+         }
+         if (this.field_909_a instanceof EntityPlayerMP) {
+-            return new Packet20NamedEntitySpawn((EntityPlayer)this.field_909_a);
++            return new Packet20NamedEntitySpawn((EntityPlayer) this.field_909_a);
+         }
+         if (this.field_909_a instanceof EntityMinecart e) {
+             if (e.minecartType == 0) {
+@@ -248,7 +216,7 @@ public class EntityTrackerEntry {
+             return new Packet23VehicleSpawn(this.field_909_a, 1);
+         }
+         if (this.field_909_a instanceof IAnimals) {
+-            return new Packet24MobSpawn((EntityLiving)this.field_909_a);
++            return new Packet24MobSpawn((EntityLiving) this.field_909_a);
+         }
+         if (this.field_909_a instanceof EntityFish) {
+             return new Packet23VehicleSpawn(this.field_909_a, 90);
+@@ -266,11 +234,11 @@ public class EntityTrackerEntry {
+             return new Packet23VehicleSpawn(this.field_909_a, 50);
+         }
+         if (this.field_909_a instanceof EntityFallingSand) {
+-            entity = (EntityFallingSand)this.field_909_a;
+-            if (((EntityFallingSand)entity).field_427_a == Block.sand.blockID) {
++            entity = this.field_909_a;
++            if (((EntityFallingSand) entity).field_427_a == Block.sand.blockID) {
+                 return new Packet23VehicleSpawn(this.field_909_a, 70);
+             }
+-            if (((EntityFallingSand)entity).field_427_a == Block.gravel.blockID) {
++            if (((EntityFallingSand) entity).field_427_a == Block.gravel.blockID) {
+                 return new Packet23VehicleSpawn(this.field_909_a, 71);
+             }
+         }
+@@ -280,7 +248,7 @@ public class EntityTrackerEntry {
+     public void func_9219_b(EntityPlayerMP entityPlayerMP) {
+         if (this.field_899_k.contains(entityPlayerMP)) {
+             this.field_899_k.remove(entityPlayerMP);
+-            entityPlayerMP.field_421_a.sendPacket(new Packet29DestroyEntity(this.field_909_a.field_331_c));
++            entityPlayerMP.netServerHandler.sendPacket(new Packet29DestroyEntity(this.field_909_a.field_331_c));
+         }
+     }
+ }
+diff --git a/main/java/net/minecraft/NetLoginHandler.java b/main/java/net/minecraft/NetLoginHandler.java
+index 5dab14e..059d11b 100644
+--- a/main/java/net/minecraft/NetLoginHandler.java
++++ b/main/java/net/minecraft/NetLoginHandler.java
+@@ -3,30 +3,19 @@
+  */
+ package net.minecraft;
+ 
++import net.minecraft.server.MinecraftServer;
++
+ import java.net.Socket;
+ import java.util.Random;
+ import java.util.logging.Logger;
+-import net.minecraft.EntityPlayerMP;
+-import net.minecraft.NetHandler;
+-import net.minecraft.NetServerHandler;
+-import net.minecraft.NetworkManager;
+-import net.minecraft.Packet;
+-import net.minecraft.Packet1Login;
+-import net.minecraft.Packet255KickDisconnect;
+-import net.minecraft.Packet2Handshake;
+-import net.minecraft.Packet3Chat;
+-import net.minecraft.Packet4UpdateTime;
+-import net.minecraft.Packet6SpawnPosition;
+-import net.minecraft.ThreadLoginVerifier;
+-import net.minecraft.server.MinecraftServer;
+ 
+ public class NetLoginHandler
+-extends NetHandler {
++        extends NetHandler {
+     public static Logger logger = Logger.getLogger("Minecraft");
+-    private static Random rand = new Random();
++    private static final Random rand = new Random();
+     public NetworkManager netManager;
+     public boolean finishedProcessing = false;
+-    private MinecraftServer mcServer;
++    private final MinecraftServer mcServer;
+     private int loginTimer = 0;
+     private String username = null;
+     private Packet1Login field_9004_h = null;
+@@ -56,8 +45,7 @@ extends NetHandler {
+             this.netManager.addToSendQueue(new Packet255KickDisconnect(string));
+             this.netManager.serverShutdown();
+             this.finishedProcessing = true;
+-        }
+-        catch (Exception exception) {
++        } catch (Exception exception) {
+             exception.printStackTrace();
+         }
+     }
+diff --git a/main/java/net/minecraft/NetServerHandler.java b/main/java/net/minecraft/NetServerHandler.java
+index d44fd13..3d9fe4d 100644
+--- a/main/java/net/minecraft/NetServerHandler.java
++++ b/main/java/net/minecraft/NetServerHandler.java
+@@ -7,35 +7,7 @@ import java.util.ArrayList;
+ import java.util.HashMap;
+ import java.util.Map;
+ import java.util.logging.Logger;
+-import net.minecraft.Entity;
+-import net.minecraft.EntityPlayerMP;
+-import net.minecraft.FontAllowedCharacters;
+-import net.minecraft.ICommandListener;
+-import net.minecraft.ItemStack;
+-import net.minecraft.MathHelper;
+-import net.minecraft.NetHandler;
+-import net.minecraft.NetworkManager;
+-import net.minecraft.Packet;
+-import net.minecraft.Packet0KeepAlive;
+-import net.minecraft.Packet101;
+-import net.minecraft.Packet102;
+-import net.minecraft.Packet103;
+-import net.minecraft.Packet106;
+-import net.minecraft.Packet10Flying;
+-import net.minecraft.Packet130;
+-import net.minecraft.Packet13PlayerLookMove;
+-import net.minecraft.Packet14BlockDig;
+-import net.minecraft.Packet15Place;
+-import net.minecraft.Packet16BlockItemSwitch;
+-import net.minecraft.Packet18ArmAnimation;
+-import net.minecraft.Packet255KickDisconnect;
+-import net.minecraft.Packet3Chat;
+-import net.minecraft.Packet53BlockChange;
+-import net.minecraft.Packet7;
+-import net.minecraft.Packet9;
+-import net.minecraft.Slot;
+-import net.minecraft.TileEntity;
+-import net.minecraft.TileEntitySign;
++
+ import net.minecraft.server.MinecraftServer;
+ 
+ public class NetServerHandler
+@@ -58,7 +30,7 @@ implements ICommandListener {
+         this.netManager = networkManager;
+         networkManager.setNetHandler(this);
+         this.playerEntity = entityPlayerMP;
+-        entityPlayerMP.field_421_a = this;
++        entityPlayerMP.netServerHandler = this;
+     }
+ 
+     public void func_42_a() {
+@@ -68,8 +40,8 @@ implements ICommandListener {
+         }
+     }
+ 
+-    public void func_43_c(String string) {
+-        this.netManager.addToSendQueue(new Packet255KickDisconnect(string));
++    public void disconnect(String reason) {
++        this.netManager.addToSendQueue(new Packet255KickDisconnect(reason));
+         this.netManager.serverShutdown();
+         this.mcServer.configManager.sendPacketToAllPlayers(new Packet3Chat("\u00a7e" + this.playerEntity.username + " left the game."));
+         this.mcServer.configManager.playerLoggedOut(this.playerEntity);
+@@ -105,7 +77,7 @@ implements ICommandListener {
+                     d7 = packet10Flying.zPosition;
+                 }
+                 this.playerEntity.onGround = packet10Flying.onGround;
+-                this.playerEntity.func_175_i();
++                this.playerEntity.sendChunks();
+                 this.playerEntity.moveEntity(d6, 0.0, d7);
+                 this.playerEntity.setPositionAndRotation(d3, d4, d5, f, f2);
+                 this.playerEntity.motionX = d6;
+@@ -141,7 +113,7 @@ implements ICommandListener {
+                 d10 = packet10Flying.zPosition;
+                 d2 = packet10Flying.stance - packet10Flying.yPosition;
+                 if (d2 > 1.65 || d2 < 0.1) {
+-                    this.func_43_c("Illegal stance");
++                    this.disconnect("Illegal stance");
+                     logger.warning(this.playerEntity.username + " had an illegal stance: " + d2);
+                 }
+                 this.playerEntity.field_418_ai = packet10Flying.stance;
+@@ -150,7 +122,7 @@ implements ICommandListener {
+                 f = packet10Flying.yaw;
+                 f3 = packet10Flying.pitch;
+             }
+-            this.playerEntity.func_175_i();
++            this.playerEntity.sendChunks();
+             this.playerEntity.field_9068_R = 0.0f;
+             this.playerEntity.setPositionAndRotation(this.field_9009_g, this.field_9008_h, this.field_9007_i, f, f3);
+             d2 = d8 - this.playerEntity.posX;
+@@ -191,7 +163,7 @@ implements ICommandListener {
+         this.field_9008_h = d2;
+         this.field_9007_i = d3;
+         this.playerEntity.setPositionAndRotation(d, d2, d3, f, f2);
+-        this.playerEntity.field_421_a.sendPacket(new Packet13PlayerLookMove(d, d2 + (double)1.62f, d2, d3, f, f2, false));
++        this.playerEntity.netServerHandler.sendPacket(new Packet13PlayerLookMove(d, d2 + (double)1.62f, d2, d3, f, f2, false));
+     }
+ 
+     public void handleBlockDig(Packet14BlockDig packet14BlockDig) {
+@@ -243,7 +215,7 @@ implements ICommandListener {
+                 this.playerEntity.field_425_ad.func_326_a(n2, n3, n4, n5);
+             }
+         } else if (packet14BlockDig.status == 3 && (d4 = (d3 = this.playerEntity.posX - ((double)n2 + 0.5)) * d3 + (d2 = this.playerEntity.posY - ((double)n3 + 0.5)) * d2 + (d = this.playerEntity.posZ - ((double)n4 + 0.5)) * d) < 256.0) {
+-            this.playerEntity.field_421_a.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
++            this.playerEntity.netServerHandler.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
+         }
+         this.mcServer.worldMngr.field_819_z = false;
+     }
+@@ -269,7 +241,7 @@ implements ICommandListener {
+             if (n > 16 || bl) {
+                 this.playerEntity.field_425_ad.func_327_a(this.playerEntity, this.mcServer.worldMngr, itemStack, n2, n3, n4, n5);
+             }
+-            this.playerEntity.field_421_a.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
++            this.playerEntity.netServerHandler.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
+             if (n5 == 0) {
+                 --n3;
+             }
+@@ -288,7 +260,7 @@ implements ICommandListener {
+             if (n5 == 5) {
+                 ++n2;
+             }
+-            this.playerEntity.field_421_a.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
++            this.playerEntity.netServerHandler.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
+         }
+         if (itemStack != null && itemStack.stackSize == 0) {
+             this.playerEntity.inventory.mainInventory[this.playerEntity.inventory.currentItem] = null;
+@@ -313,7 +285,7 @@ implements ICommandListener {
+ 
+     public void func_6001_a(Packet packet) {
+         logger.warning(this.getClass() + " wasn't prepared to deal with a " + packet.getClass());
+-        this.func_43_c("Protocol error, unexpected packet");
++        this.disconnect("Protocol error, unexpected packet");
+     }
+ 
+     public void sendPacket(Packet packet) {
+@@ -327,13 +299,13 @@ implements ICommandListener {
+     public void handleChat(Packet3Chat packet3Chat) {
+         String string = packet3Chat.message;
+         if (string.length() > 100) {
+-            this.func_43_c("Chat message too long");
++            this.disconnect("Chat message too long");
+             return;
+         }
+         string = string.trim();
+         for (int i = 0; i < string.length(); ++i) {
+             if (FontAllowedCharacters.field_20162_a.indexOf(string.charAt(i)) >= 0) continue;
+-            this.func_43_c("Illegal characters in chat");
++            this.disconnect("Illegal characters in chat");
+             return;
+         }
+         if (string.startsWith("/")) {
+@@ -377,9 +349,9 @@ implements ICommandListener {
+         if (packet18ArmAnimation.animate == 1) {
+             this.playerEntity.func_168_z();
+         } else if (packet18ArmAnimation.animate == 104) {
+-            this.playerEntity.field_12012_al = true;
++            this.playerEntity.sneaking = true;
+         } else if (packet18ArmAnimation.animate == 105) {
+-            this.playerEntity.field_12012_al = false;
++            this.playerEntity.sneaking = false;
+         }
+     }
+ 
+@@ -425,14 +397,14 @@ implements ICommandListener {
+         if (this.playerEntity.field_20052_ap.field_20134_f == packet102.field_20024_a && this.playerEntity.field_20052_ap.func_20124_c(this.playerEntity)) {
+             ItemStack itemStack = this.playerEntity.field_20052_ap.func_20123_a(packet102.field_20023_b, packet102.field_20027_c, this.playerEntity);
+             if (ItemStack.func_20119_a(packet102.field_20025_e, itemStack)) {
+-                this.playerEntity.field_421_a.sendPacket(new Packet106(packet102.field_20024_a, packet102.field_20026_d, true));
++                this.playerEntity.netServerHandler.sendPacket(new Packet106(packet102.field_20024_a, packet102.field_20026_d, true));
+                 this.playerEntity.field_20064_am = true;
+                 this.playerEntity.field_20052_ap.func_20125_a();
+                 this.playerEntity.func_20058_J();
+                 this.playerEntity.field_20064_am = false;
+             } else {
+                 this.field_10_k.put(this.playerEntity.field_20052_ap.field_20134_f, packet102.field_20026_d);
+-                this.playerEntity.field_421_a.sendPacket(new Packet106(packet102.field_20024_a, packet102.field_20026_d, false));
++                this.playerEntity.netServerHandler.sendPacket(new Packet106(packet102.field_20024_a, packet102.field_20026_d, false));
+                 this.playerEntity.field_20052_ap.func_20129_a(this.playerEntity, false);
+                 ArrayList<ItemStack> arrayList = new ArrayList<ItemStack>();
+                 for (int i = 0; i < this.playerEntity.field_20052_ap.field_20135_e.size(); ++i) {
+diff --git a/main/java/net/minecraft/NetworkListenThread.java b/main/java/net/minecraft/NetworkListenThread.java
+index 210d1e0..b2839a4 100644
+--- a/main/java/net/minecraft/NetworkListenThread.java
++++ b/main/java/net/minecraft/NetworkListenThread.java
+@@ -9,10 +9,7 @@ import java.net.ServerSocket;
+ import java.util.ArrayList;
+ import java.util.logging.Level;
+ import java.util.logging.Logger;
+-import net.minecraft.NetHandler;
+-import net.minecraft.NetLoginHandler;
+-import net.minecraft.NetServerHandler;
+-import net.minecraft.NetworkAcceptThread;
++
+ import net.minecraft.server.MinecraftServer;
+ 
+ public class NetworkListenThread {
+@@ -67,7 +64,7 @@ public class NetworkListenThread {
+             }
+             catch (Exception exception) {
+                 logger.log(Level.WARNING, "Failed to handle packet: " + exception, exception);
+-                ((NetServerHandler)netHandler).func_43_c("Internal server error");
++                ((NetServerHandler)netHandler).disconnect("Internal server error");
+             }
+             if (!((NetServerHandler)netHandler).field_18_c) continue;
+             this.field_975_h.remove(n--);
+diff --git a/main/java/net/minecraft/PlayerInstance.java b/main/java/net/minecraft/PlayerInstance.java
+index f7cbbe0..dda579f 100644
+--- a/main/java/net/minecraft/PlayerInstance.java
++++ b/main/java/net/minecraft/PlayerInstance.java
+@@ -5,16 +5,6 @@ package net.minecraft;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
+-import net.minecraft.Block;
+-import net.minecraft.ChunkCoordIntPair;
+-import net.minecraft.EntityPlayerMP;
+-import net.minecraft.Packet;
+-import net.minecraft.Packet50PreChunk;
+-import net.minecraft.Packet51MapChunk;
+-import net.minecraft.Packet52MultiBlockChange;
+-import net.minecraft.Packet53BlockChange;
+-import net.minecraft.PlayerManager;
+-import net.minecraft.TileEntity;
+ 
+ class PlayerInstance {
+     private List field_1072_b = new ArrayList();
+@@ -44,7 +34,7 @@ class PlayerInstance {
+             throw new IllegalStateException("Failed to add player. " + entityPlayerMP + " already is in chunk " + this.field_1071_c + ", " + this.field_1070_d);
+         }
+         entityPlayerMP.field_420_ah.add(this.field_1069_e);
+-        entityPlayerMP.field_421_a.sendPacket(new Packet50PreChunk(this.field_1069_e.chunkXPos, this.field_1069_e.chunkZPos, true));
++        entityPlayerMP.netServerHandler.sendPacket(new Packet50PreChunk(this.field_1069_e.chunkXPos, this.field_1069_e.chunkZPos, true));
+         this.field_1072_b.add(entityPlayerMP);
+         entityPlayerMP.loadedChunks.add(this.field_1069_e);
+     }
+@@ -65,7 +55,7 @@ class PlayerInstance {
+         }
+         entityPlayerMP.loadedChunks.remove(this.field_1069_e);
+         if (entityPlayerMP.field_420_ah.contains(this.field_1069_e)) {
+-            entityPlayerMP.field_421_a.sendPacket(new Packet50PreChunk(this.field_1071_c, this.field_1070_d, false));
++            entityPlayerMP.netServerHandler.sendPacket(new Packet50PreChunk(this.field_1071_c, this.field_1070_d, false));
+         }
+     }
+ 
+@@ -108,7 +98,7 @@ class PlayerInstance {
+         for (int i = 0; i < this.field_1072_b.size(); ++i) {
+             EntityPlayerMP entityPlayerMP = (EntityPlayerMP)this.field_1072_b.get(i);
+             if (!entityPlayerMP.field_420_ah.contains(this.field_1069_e)) continue;
+-            entityPlayerMP.field_421_a.sendPacket(packet);
++            entityPlayerMP.netServerHandler.sendPacket(packet);
+         }
+     }
+ 
+diff --git a/main/java/net/minecraft/ServerConfigurationManager.java b/main/java/net/minecraft/ServerConfigurationManager.java
+index ebe4aeb..7cecbc5 100644
+--- a/main/java/net/minecraft/ServerConfigurationManager.java
++++ b/main/java/net/minecraft/ServerConfigurationManager.java
+@@ -13,16 +13,7 @@ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Set;
+ import java.util.logging.Logger;
+-import net.minecraft.EntityPlayerMP;
+-import net.minecraft.ItemInWorldManager;
+-import net.minecraft.NetLoginHandler;
+-import net.minecraft.Packet;
+-import net.minecraft.Packet3Chat;
+-import net.minecraft.Packet9;
+-import net.minecraft.PlayerManager;
+-import net.minecraft.PlayerNBTManager;
+-import net.minecraft.TileEntity;
+-import net.minecraft.WorldServer;
++
+ import net.minecraft.server.MinecraftServer;
+ 
+ public class ServerConfigurationManager {
+@@ -102,7 +93,7 @@ public class ServerConfigurationManager {
+         for (int i = 0; i < this.playerEntities.size(); ++i) {
+             EntityPlayerMP entityPlayerMP = (EntityPlayerMP)this.playerEntities.get(i);
+             if (!entityPlayerMP.username.equalsIgnoreCase(string)) continue;
+-            entityPlayerMP.field_421_a.func_43_c("You logged in from another location");
++            entityPlayerMP.netServerHandler.disconnect("You logged in from another location");
+         }
+         return new EntityPlayerMP(this.mcServer, this.mcServer.worldMngr, string, new ItemInWorldManager(this.mcServer.worldMngr));
+     }
+@@ -115,13 +106,13 @@ public class ServerConfigurationManager {
+         this.mcServer.worldMngr.func_20110_e(entityPlayerMP);
+         EntityPlayerMP entityPlayerMP2 = new EntityPlayerMP(this.mcServer, this.mcServer.worldMngr, entityPlayerMP.username, new ItemInWorldManager(this.mcServer.worldMngr));
+         entityPlayerMP2.field_331_c = entityPlayerMP.field_331_c;
+-        entityPlayerMP2.field_421_a = entityPlayerMP.field_421_a;
++        entityPlayerMP2.netServerHandler = entityPlayerMP.netServerHandler;
+         this.mcServer.worldMngr.field_821_y.loadChunk((int)entityPlayerMP2.posX >> 4, (int)entityPlayerMP2.posZ >> 4);
+         while (this.mcServer.worldMngr.getCollidingBoundingBoxes(entityPlayerMP2, entityPlayerMP2.boundingBox).size() != 0) {
+             entityPlayerMP2.setPosition(entityPlayerMP2.posX, entityPlayerMP2.posY + 1.0, entityPlayerMP2.posZ);
+         }
+-        entityPlayerMP2.field_421_a.sendPacket(new Packet9());
+-        entityPlayerMP2.field_421_a.func_41_a(entityPlayerMP2.posX, entityPlayerMP2.posY, entityPlayerMP2.posZ, entityPlayerMP2.rotationYaw, entityPlayerMP2.rotationPitch);
++        entityPlayerMP2.netServerHandler.sendPacket(new Packet9());
++        entityPlayerMP2.netServerHandler.func_41_a(entityPlayerMP2.posX, entityPlayerMP2.posY, entityPlayerMP2.posZ, entityPlayerMP2.rotationYaw, entityPlayerMP2.rotationPitch);
+         this.playerManagerObj.func_9214_a(entityPlayerMP2);
+         this.mcServer.worldMngr.entityJoinedWorld(entityPlayerMP2);
+         this.playerEntities.add(entityPlayerMP2);
+@@ -140,7 +131,7 @@ public class ServerConfigurationManager {
+     public void sendPacketToAllPlayers(Packet packet) {
+         for (int i = 0; i < this.playerEntities.size(); ++i) {
+             EntityPlayerMP entityPlayerMP = (EntityPlayerMP)this.playerEntities.get(i);
+-            entityPlayerMP.field_421_a.sendPacket(packet);
++            entityPlayerMP.netServerHandler.sendPacket(packet);
+         }
+     }
+ 
+@@ -285,7 +276,7 @@ public class ServerConfigurationManager {
+     public void sendChatMessageToPlayer(String string, String string2) {
+         EntityPlayerMP entityPlayerMP = this.getPlayerEntity(string);
+         if (entityPlayerMP != null) {
+-            entityPlayerMP.field_421_a.sendPacket(new Packet3Chat(string2));
++            entityPlayerMP.netServerHandler.sendPacket(new Packet3Chat(string2));
+         }
+     }
+ 
+@@ -296,7 +287,7 @@ public class ServerConfigurationManager {
+             double d6 = d2 - entityPlayerMP.posY;
+             double d7 = d3 - entityPlayerMP.posZ;
+             if (!(d5 * d5 + d6 * d6 + d7 * d7 < d4 * d4)) continue;
+-            entityPlayerMP.field_421_a.sendPacket(packet);
++            entityPlayerMP.netServerHandler.sendPacket(packet);
+         }
+     }
+ 
+@@ -305,14 +296,14 @@ public class ServerConfigurationManager {
+         for (int i = 0; i < this.playerEntities.size(); ++i) {
+             EntityPlayerMP entityPlayerMP = (EntityPlayerMP)this.playerEntities.get(i);
+             if (!this.isOp(entityPlayerMP.username)) continue;
+-            entityPlayerMP.field_421_a.sendPacket(packet3Chat);
++            entityPlayerMP.netServerHandler.sendPacket(packet3Chat);
+         }
+     }
+ 
+     public boolean sendPacketToPlayer(String string, Packet packet) {
+         EntityPlayerMP entityPlayerMP = this.getPlayerEntity(string);
+         if (entityPlayerMP != null) {
+-            entityPlayerMP.field_421_a.sendPacket(packet);
++            entityPlayerMP.netServerHandler.sendPacket(packet);
+             return true;
+         }
+         return false;
+diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
+index f17cc3c..9830540 100644
+--- a/main/java/net/minecraft/server/MinecraftServer.java
++++ b/main/java/net/minecraft/server/MinecraftServer.java
+@@ -61,7 +61,7 @@ Runnable {
+         new ThreadSleepForever(this);
+     }
+ 
+-    private boolean func_6008_d() {
++    private boolean start() {
+         ThreadCommandReader threadCommandReader = new ThreadCommandReader(this);
+         threadCommandReader.setDaemon(true);
+         threadCommandReader.start();
+@@ -107,12 +107,12 @@ Runnable {
+         this.field_6028_k = new EntityTracker(this);
+         String string2 = this.propertyManagerObj.getStringProperty("level-name", "world");
+         logger.info("Preparing level \"" + string2 + "\"");
+-        this.func_6017_c(string2);
++        this.preareSpawn(string2);
+         logger.info("Done! For help, type \"help\" or \"?\"");
+         return true;
+     }
+ 
+-    private void func_6017_c(String string) {
++    private void preareSpawn(String string) {
+         logger.info("Preparing start region");
+         this.worldMngr = new WorldServer(this, new File("."), string, this.propertyManagerObj.getBooleanProperty("hellworld", false) ? -1 : 0);
+         this.worldMngr.func_4072_a(new WorldManager(this));
+@@ -147,7 +147,7 @@ Runnable {
+         this.worldMngr.saveWorld(true, null);
+     }
+ 
+-    private void func_6013_g() {
++    private void stop() {
+         logger.info("Stopping server");
+         if (this.configManager != null) {
+             this.configManager.savePlayerStates();
+@@ -166,7 +166,7 @@ Runnable {
+      */
+     public void run() {
+         try {
+-            if (this.func_6008_d()) {
++            if (this.start()) {
+                 long l = System.currentTimeMillis();
+                 long l2 = 0L;
+                 while (this.field_6025_n) {
+@@ -214,7 +214,7 @@ Runnable {
+             }
+         }
+         finally {
+-            this.func_6013_g();
++            this.stop();
+             this.field_6032_g = true;
+             System.exit(0);
+         }
+@@ -350,7 +350,7 @@ Runnable {
+                     this.func_6014_a(string2, "Banning " + (String)arg);
+                     object = this.configManager.getPlayerEntity((String)arg);
+                     if (object == null) continue;
+-                    ((EntityPlayerMP)object).field_421_a.func_43_c("Banned by admin");
++                    ((EntityPlayerMP)object).netServerHandler.disconnect("Banned by admin");
+                     continue;
+                 }
+                 if (string.toLowerCase().startsWith("pardon ")) {
+@@ -368,7 +368,7 @@ Runnable {
+                         object = entityPlayerMP;
+                     }
+                     if (object != null) {
+-                        ((EntityPlayerMP)object).field_421_a.func_43_c("Kicked by admin");
++                        ((EntityPlayerMP)object).netServerHandler.disconnect("Kicked by admin");
+                         this.func_6014_a(string2, "Kicking " + ((EntityPlayerMP)object).username);
+                         continue;
+                     }
+@@ -389,7 +389,7 @@ Runnable {
+                             iCommandListener.log("Can't find user " + stringArray[2] + ". No tp.");
+                             continue;
+                         }
+-                        ((EntityPlayerMP)object).field_421_a.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
++                        ((EntityPlayerMP)object).netServerHandler.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
+                         this.func_6014_a(string2, "Teleporting " + stringArray[1] + " to " + stringArray[2] + ".");
+                         continue;
+                     }
+-- 
+2.36.1
+
