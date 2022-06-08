@@ -1,7 +1,7 @@
-From 1f977a5e4bb85a42a059f84a7a308bc2e34ef2b9 Mon Sep 17 00:00:00 2001
+From 070a58116bdd4cbe5c3bca6e51ab5b92aaebfc31 Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Wed, 8 Jun 2022 04:22:21 -0500
-Subject: [PATCH 4/4] Implement player API interface
+Subject: [PATCH 4/6] Implement player API interface
 
 ---
  main/java/net/minecraft/EntityPlayerMP.java | 15 ++++++++++++++-
@@ -47,5 +47,5 @@ index 37baad2..9ffc61f 100644
  }
  
 -- 
-2.36.1
+2.33.0.windows.2
 

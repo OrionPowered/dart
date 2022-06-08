@@ -1,7 +1,7 @@
-From 95fb9e8ec84240bc1148b02f996483d80b7ab400 Mon Sep 17 00:00:00 2001
+From 1e9e813dd03e0d0c0dded7ac27b6808950a383fe Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Wed, 8 Jun 2022 04:15:18 -0500
-Subject: [PATCH 3/4] Send join message to incoming player as well
+Subject: [PATCH 3/6] Send join message to incoming player as well
 
 ---
  main/java/net/minecraft/NetLoginHandler.java | 6 +++++-
@@ -25,5 +25,5 @@ index 059d11b..acfab40 100644
              netServerHandler.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
              this.mcServer.field_6036_c.func_4108_a(netServerHandler);
 -- 
-2.36.1
+2.33.0.windows.2
 
