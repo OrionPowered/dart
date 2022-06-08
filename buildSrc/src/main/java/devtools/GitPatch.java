@@ -40,7 +40,7 @@ public class GitPatch {
         return git.get();
     }
 
-    public static void setupRepository() {
+    public static void setup() {
         try {
             Git git = Git.init().setDirectory(gitDir.get()).call();
             git.add().addFilepattern(".").call();
@@ -53,18 +53,7 @@ public class GitPatch {
         } catch (GitAPIException e) {
             throw new RuntimeException("Failed to setup local git repository", e);
         }
-    }
-
-    public static void generate() {
-        File patchDir = DartPlugin.getPatchDir();
-        RevCommit commit = firstCommit.get();
-
-        try {
-            ProcessBuilder builder = new ProcessBuilder("git", "format-patch", commit.getName(), "-o", patchDir.getAbsolutePath());
-            process(builder);
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException("Failed generating patches", e);
-        }
+        apply();
     }
 
     public static void apply() {
@@ -78,13 +67,24 @@ public class GitPatch {
         });
     }
 
+    public static void generate() {
+        File patchDir = DartPlugin.getPatchDir();
+        RevCommit commit = firstCommit.get();
+        try {
+            ProcessBuilder builder = new ProcessBuilder("git", "format-patch", commit.getName(), "-o", patchDir.getAbsolutePath());
+            process(builder);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Failed generating patches", e);
+        }
+    }
+
     private static void process(ProcessBuilder builder) throws IOException, InterruptedException {
-        builder.directory(DartPlugin.getProjectDir());
+        builder.directory(gitDir.get());
         builder.inheritIO();
         builder.redirectErrorStream(true);
         builder.redirectError(ProcessBuilder.Redirect.INHERIT);
         builder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-        Process patchProcess = builder.start();
-        patchProcess.waitFor();
+        Process process = builder.start();
+        process.waitFor();
     }
 }

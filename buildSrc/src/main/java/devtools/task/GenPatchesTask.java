@@ -12,6 +12,7 @@ public class GenPatchesTask extends DefaultTask {
 
     @TaskAction
     public void run() {
+        System.out.println("Generating patches");
         GitPatch.generate();
     }
 

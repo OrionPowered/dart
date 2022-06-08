@@ -18,6 +18,7 @@ public class DartPlugin implements org.gradle.api.Plugin<Project> {
     public static final Lazy<TinyMCP> tinymcp = Lazy.delayed();
     private static final Lazy<File> patchDir = new Lazy<>(() -> new File(project.get().getProjectDir(), "patches"));
     private static final Lazy<File> sourceDir = new Lazy<>(() -> new File(project.get().getProjectDir(), "src/main/java"));
+    private static final Lazy<File> resourceDir = new Lazy<>(() -> new File(project.get().getProjectDir(), "src/main/resources"));
 
     @Override
     public void apply(Project project) {
@@ -53,6 +54,10 @@ public class DartPlugin implements org.gradle.api.Plugin<Project> {
 
     public static File getSourceDir() {
         return sourceDir.get();
+    }
+
+    public static File getResourceDir() {
+        return resourceDir.get();
     }
 
     public static File getPatchDir() {

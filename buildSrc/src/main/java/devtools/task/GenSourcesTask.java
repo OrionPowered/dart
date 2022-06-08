@@ -47,8 +47,7 @@ public class GenSourcesTask extends DefaultTask {
                 File cfrSummary = new File(srcDir, "summary.txt");
                 if (cfrSummary.exists()) cfrSummary.delete();
 
-                GitPatch.setupRepository();
-                GitPatch.apply();
+                GitPatch.setup();
             } else throw new GradleException("Failed to setup project sources at " + srcDir);
         }
     }
