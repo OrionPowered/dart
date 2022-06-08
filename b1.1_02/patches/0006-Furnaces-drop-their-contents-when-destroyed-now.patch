@@ -1,0 +1,57 @@
+From 4caf57e1eb3c0e1111dbdb2b88386f099544dc89 Mon Sep 17 00:00:00 2001
+From: Papa-Quill <70424791+Papa-Quill@users.noreply.github.com>
+Date: Wed, 8 Jun 2022 15:45:34 -0500
+Subject: [PATCH 6/6] Furnaces drop their contents when destroyed now
+
+---
+ main/java/net/minecraft/BlockFurnace.java | 27 ++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/main/java/net/minecraft/BlockFurnace.java b/main/java/net/minecraft/BlockFurnace.java
+index c7304d7..e05e590 100644
+--- a/main/java/net/minecraft/BlockFurnace.java
++++ b/main/java/net/minecraft/BlockFurnace.java
+@@ -17,7 +17,7 @@ import net.minecraft.World;
+ public class BlockFurnace
+ extends BlockContainer {
+     private final boolean field_655_a;
+-
++    private Random field_656_a = new Random();
+     protected BlockFurnace(int n, boolean bl) {
+         super(n, Material.rock);
+         this.field_655_a = bl;
+@@ -66,6 +66,31 @@ extends BlockContainer {
+         }
+         return this.blockIndexInTexture;
+     }
++        // Furnaces drop their contents on removal
++    public void onBlockRemoval(World world, int n, int n2, int n3) {
++        TileEntityFurnace tileEntityFurnace = (TileEntityFurnace)world.getBlockTileEntity(n, n2, n3);
++        for (int i = 0; i < tileEntityFurnace.getSizeInventory(); ++i) {
++            ItemStack itemStack = tileEntityFurnace.getStackInSlot(i);
++            if (itemStack == null) continue;
++            float f = this.field_656_a.nextFloat() * 0.8f + 0.1f;
++            float f2 = this.field_656_a.nextFloat() * 0.8f + 0.1f;
++            float f3 = this.field_656_a.nextFloat() * 0.8f + 0.1f;
++            while (itemStack.stackSize > 0) {
++                int n4 = this.field_656_a.nextInt(21) + 10;
++                if (n4 > itemStack.stackSize) {
++                    n4 = itemStack.stackSize;
++                }
++                itemStack.stackSize -= n4;
++                EntityItem entityItem = new EntityItem(world, (float)n + f, (float)n2 + f2, (float)n3 + f3, new ItemStack(itemStack.itemID, n4, itemStack.itemDamage));
++                float f4 = 0.05f;
++                entityItem.motionX = (float)this.field_656_a.nextGaussian() * f4;
++                entityItem.motionY = (float)this.field_656_a.nextGaussian() * f4 + 0.2f;
++                entityItem.motionZ = (float)this.field_656_a.nextGaussian() * f4;
++                world.entityJoinedWorld(entityItem);
++            }
++        }
++        super.onBlockRemoval(world, n, n2, n3);
++    }
+ 
+     public boolean blockActivated(World world, int n, int n2, int n3, EntityPlayer entityPlayer) {
+         if (world.multiplayerWorld) {
+-- 
+2.33.0.windows.2
+
