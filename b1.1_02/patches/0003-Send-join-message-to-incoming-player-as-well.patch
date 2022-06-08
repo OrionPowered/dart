@@ -1,0 +1,29 @@
+From 95fb9e8ec84240bc1148b02f996483d80b7ab400 Mon Sep 17 00:00:00 2001
+From: Alex Sobiek <alex@alexsobiek.com>
+Date: Wed, 8 Jun 2022 04:15:18 -0500
+Subject: [PATCH 3/4] Send join message to incoming player as well
+
+---
+ main/java/net/minecraft/NetLoginHandler.java | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/main/java/net/minecraft/NetLoginHandler.java b/main/java/net/minecraft/NetLoginHandler.java
+index 059d11b..acfab40 100644
+--- a/main/java/net/minecraft/NetLoginHandler.java
++++ b/main/java/net/minecraft/NetLoginHandler.java
+@@ -83,7 +83,11 @@ public class NetLoginHandler
+             NetServerHandler netServerHandler = new NetServerHandler(this.mcServer, this.netManager, entityPlayerMP);
+             netServerHandler.sendPacket(new Packet1Login("", "", entityPlayerMP.field_331_c, this.mcServer.worldMngr.randomSeed, (byte)this.mcServer.worldMngr.worldProvider.worldType));
+             netServerHandler.sendPacket(new Packet6SpawnPosition(this.mcServer.worldMngr.spawnX, this.mcServer.worldMngr.spawnY, this.mcServer.worldMngr.spawnZ));
+-            this.mcServer.configManager.sendPacketToAllPlayers(new Packet3Chat("\u00a7e" + entityPlayerMP.username + " joined the game."));
++            // Start Dart - Send player join message as well
++            Packet3Chat joinMsg = new Packet3Chat("\u00a7e" + entityPlayerMP.username + " joined the game.");
++            this.mcServer.configManager.sendPacketToAllPlayers(joinMsg);
++            netServerHandler.sendPacket(joinMsg);
++            // End Dart
+             this.mcServer.configManager.playerLoggedIn(entityPlayerMP);
+             netServerHandler.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
+             this.mcServer.field_6036_c.func_4108_a(netServerHandler);
+-- 
+2.36.1
+
