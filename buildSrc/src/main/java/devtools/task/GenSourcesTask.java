@@ -13,9 +13,11 @@ import org.gradle.api.Project;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.TaskAction;
 
-import java.io.File;
+import java.io.*;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class GenSourcesTask extends DefaultTask {
     public static void register(Project project) {
@@ -37,6 +39,7 @@ public class GenSourcesTask extends DefaultTask {
             File srcDir = DartPlugin.getSourceDir();
             if (srcDir.exists() || srcDir.mkdirs()) {
                 // decompile sources
+                extractResources(jar, DartPlugin.getResourceDir());
                 Options options = OptionsImpl.getFactory().create(Map.of(
                         "renameillegalidents", "true",
                         "outputdir", srcDir.getAbsolutePath()
@@ -50,5 +53,33 @@ public class GenSourcesTask extends DefaultTask {
                 GitPatch.setup();
             } else throw new GradleException("Failed to setup project sources at " + srcDir);
         }
+    }
+
+    private void extractResources(File jar, File out) {
+        if (out.exists() || out.mkdirs()) {
+            try {
+                ZipInputStream zis = new ZipInputStream(new FileInputStream(jar));
+                ZipEntry entry = zis.getNextEntry();
+                while (entry != null) {
+                    File output = new File(out, entry.getName());
+                    System.out.println("Extracting " + entry.getName());
+                    if (entry.isDirectory()) {
+                        if (!out.exists() && !out.mkdirs()) throw new IOException("Failed creating directory " + output);
+                    } else if (!entry.getName().endsWith(".class")) {
+                        if (output.getParentFile().exists() || output.getParentFile().mkdirs()) {
+                            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(output));
+                            byte[] bytesIn = new byte[4096];
+                            int read;
+                            while ((read = zis.read(bytesIn)) != -1) bos.write(bytesIn, 0, read);
+                            bos.close();
+                        } else throw new IOException("Failed creating file " + output);
+                    }
+                    zis.closeEntry();
+                    entry = zis.getNextEntry();
+                }
+            } catch (IOException e) {
+                throw new GradleException("Failed to extract jar resources", e);
+            }
+        } else throw new GradleException("Failed to setup project sources at " + out);
     }
 }
