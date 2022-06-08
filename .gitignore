@@ -19,6 +19,7 @@ build
 # Project
 .tinymcp/
 .quill/
+run/
 
 # Servers
 b1.1_02/src/
