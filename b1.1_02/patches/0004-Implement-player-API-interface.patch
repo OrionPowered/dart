@@ -1,0 +1,51 @@
+From 1f977a5e4bb85a42a059f84a7a308bc2e34ef2b9 Mon Sep 17 00:00:00 2001
+From: Alex Sobiek <alex@alexsobiek.com>
+Date: Wed, 8 Jun 2022 04:22:21 -0500
+Subject: [PATCH 4/4] Implement player API interface
+
+---
+ main/java/net/minecraft/EntityPlayerMP.java | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/main/java/net/minecraft/EntityPlayerMP.java b/main/java/net/minecraft/EntityPlayerMP.java
+index 37baad2..9ffc61f 100644
+--- a/main/java/net/minecraft/EntityPlayerMP.java
++++ b/main/java/net/minecraft/EntityPlayerMP.java
+@@ -3,6 +3,7 @@
+  */
+ package net.minecraft;
+ 
++import com.github.quillmc.dart.api.entity.Player;
+ import net.minecraft.server.MinecraftServer;
+ 
+ import java.util.HashSet;
+@@ -12,7 +13,7 @@ import java.util.Set;
+ 
+ public class EntityPlayerMP
+         extends EntityPlayer
+-        implements ICrafting {
++        implements Player, ICrafting {
+     public NetServerHandler netServerHandler;
+     public MinecraftServer mcServer;
+     public ItemInWorldManager field_425_ad;
+@@ -263,5 +264,17 @@ public class EntityPlayerMP
+         this.field_20052_ap.func_20130_a(this);
+         this.field_20052_ap = this.field_20053_ao;
+     }
++
++    // Dart - Begin API methods
++
++    public String getUsername() {
++        return username;
++    }
++
++    public void sendMessage(String message) {
++        netServerHandler.sendPacket(new Packet3Chat(message));
++    }
++
++    // Dart - End API methods
+ }
+ 
+-- 
+2.36.1
+
