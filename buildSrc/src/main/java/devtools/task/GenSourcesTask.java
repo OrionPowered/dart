@@ -7,8 +7,6 @@ import devtools.GitPatch;
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.util.getopt.Options;
 import org.benf.cfr.reader.util.getopt.OptionsImpl;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
@@ -24,15 +22,11 @@ public class GenSourcesTask extends DefaultTask {
         project.getTasks().register("genSources", GenSourcesTask.class);
     }
 
-    private Property<Version> version;
-
     @TaskAction
     public void run() {
         Property<Version> version = DartPlugin.getExtension().getServerVersion();
         if (version.isPresent()) {
             Version v = version.get();
-            Project project = DartPlugin.get().getProject();
-            File projectDir = project.getProjectDir();
             System.out.println("Setting up development environment for Minecraft version " + v);
 
             TinyMCP mcp = v.server();
