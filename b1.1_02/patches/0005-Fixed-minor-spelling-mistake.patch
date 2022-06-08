@@ -1,0 +1,25 @@
+From fe7b6aef1c72bf96d84f85c38c08bfacb6be0660 Mon Sep 17 00:00:00 2001
+From: Papa-Quill <70424791+Papa-Quill@users.noreply.github.com>
+Date: Wed, 8 Jun 2022 15:30:48 -0500
+Subject: [PATCH 5/6] Fixed minor spelling mistake
+
+---
+ main/java/net/minecraft/server/MinecraftServer.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
+index 9830540..510c39e 100644
+--- a/main/java/net/minecraft/server/MinecraftServer.java
++++ b/main/java/net/minecraft/server/MinecraftServer.java
+@@ -393,7 +393,7 @@ Runnable {
+                         this.func_6014_a(string2, "Teleporting " + stringArray[1] + " to " + stringArray[2] + ".");
+                         continue;
+                     }
+-                    iCommandListener.log("Syntax error, please provice a source and a target.");
++                    iCommandListener.log("Syntax error, please provide a source and a target.");
+                     continue;
+                 }
+                 if (string.toLowerCase().startsWith("give ")) {
+-- 
+2.33.0.windows.2
+
