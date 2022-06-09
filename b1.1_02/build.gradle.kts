@@ -2,6 +2,7 @@ import com.github.quillmc.tinymcp.Version
 
 plugins {
     java
+    id("Quill.java-conventions")
     id("devtools")
 }
 
@@ -10,7 +11,5 @@ dart {
 }
 
 dependencies {
-    implementation(project(":api"))
-    compileOnly("org.projectlombok:lombok:1.18.24")
-    annotationProcessor("org.projectlombok:lombok:1.18.24")
+    implementation(project(":dart"))
 }

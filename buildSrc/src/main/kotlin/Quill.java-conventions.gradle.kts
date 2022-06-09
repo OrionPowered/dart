@@ -6,14 +6,17 @@ plugins {
     id("com.github.monosoul.yadegrap")
 }
 
-group = "com.alexsobiek.quill.buildtools"
-version = "1.18.2-SNAPSHOT"
+group = "com.github.quill"
+version = "1.0-SNAPSHOT"
 
 java.sourceCompatibility = JavaVersion.VERSION_17
 java.targetCompatibility = JavaVersion.VERSION_17
 
-dependencies.compileOnly("org.projectlombok:lombok:1.18.22")
-dependencies.annotationProcessor("org.projectlombok:lombok:1.18.22")
+dependencies{
+    compileOnly("org.projectlombok:lombok:1.18.22")
+    annotationProcessor("org.projectlombok:lombok:1.18.22")
+}
+
 
 tasks {
     val delombok = "delombok"(DelombokTask::class)
