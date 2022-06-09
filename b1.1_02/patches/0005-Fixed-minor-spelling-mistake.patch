@@ -1,7 +1,7 @@
-From fe7b6aef1c72bf96d84f85c38c08bfacb6be0660 Mon Sep 17 00:00:00 2001
+From c98610cce42dcddf81a32008bac1ed59fe2a6a30 Mon Sep 17 00:00:00 2001
 From: Papa-Quill <70424791+Papa-Quill@users.noreply.github.com>
 Date: Wed, 8 Jun 2022 15:30:48 -0500
-Subject: [PATCH 5/6] Fixed minor spelling mistake
+Subject: [PATCH] Fixed minor spelling mistake
 
 ---
  main/java/net/minecraft/server/MinecraftServer.java | 2 +-
@@ -21,5 +21,5 @@ index 9830540..510c39e 100644
                  }
                  if (string.toLowerCase().startsWith("give ")) {
 -- 
-2.33.0.windows.2
+2.36.1
 

@@ -1,7 +1,7 @@
-From 4e5610d9486e54cd3ee4170e3a96473a7b1f26f8 Mon Sep 17 00:00:00 2001
+From 1a98daf9db39eb7a60093ec43a9ba3113d42fa93 Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Wed, 8 Jun 2022 04:15:04 -0500
-Subject: [PATCH 2/6] Mapped additional fields and methods
+Subject: [PATCH] Mapped additional fields and methods
 
 ---
  main/java/net/minecraft/EntityPlayerMP.java   | 93 +++++++------------
@@ -919,5 +919,5 @@ index f17cc3c..9830540 100644
                          continue;
                      }
 -- 
-2.33.0.windows.2
+2.36.1
 

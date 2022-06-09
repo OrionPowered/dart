@@ -1,7 +1,7 @@
-From 4caf57e1eb3c0e1111dbdb2b88386f099544dc89 Mon Sep 17 00:00:00 2001
+From 01bba7c74b6080d9049973d79c11b86ab8396b1c Mon Sep 17 00:00:00 2001
 From: Papa-Quill <70424791+Papa-Quill@users.noreply.github.com>
 Date: Wed, 8 Jun 2022 15:45:34 -0500
-Subject: [PATCH 6/6] Furnaces drop their contents when destroyed now
+Subject: [PATCH] Furnaces drop their contents when destroyed now
 
 ---
  main/java/net/minecraft/BlockFurnace.java | 27 ++++++++++++++++++++++-
@@ -53,5 +53,5 @@ index c7304d7..e05e590 100644
      public boolean blockActivated(World world, int n, int n2, int n3, EntityPlayer entityPlayer) {
          if (world.multiplayerWorld) {
 -- 
-2.33.0.windows.2
+2.36.1
 
