@@ -1,17 +1,19 @@
-package com.github.quillmc.dart.api;
+package com.github.quillmc.dart.api.plugin;
 
 import com.alexsobiek.async.event.Event;
+import com.github.quillmc.dart.api.Server;
+import com.github.quillmc.dart.api.entity.Player;
 
 import java.util.function.Consumer;
 
-public abstract class DartPlugin {
-    protected Server server;
+public abstract class AbstractDartPlugin<P extends Player> {
+    protected Server<P> server;
 
     /**
      * Returns this server
      * @return Server
      */
-    public Server getServer() {
+    public Server<P> getServer() {
         return server;
     }
 
@@ -24,4 +26,8 @@ public abstract class DartPlugin {
     public <T extends Event> void listen(Class<T> eventClass, Consumer<T> listener) {
         server.getEventBus().listen(eventClass, listener);
     }
+
+    public abstract void onEnable();
+
+    public abstract void onDisable();
 }
