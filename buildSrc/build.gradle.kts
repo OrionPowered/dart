@@ -10,6 +10,8 @@ repositories {
 }
 
 dependencies {
+    compileOnly("org.projectlombok:lombok:1.18.24")
+    annotationProcessor("org.projectlombok:lombok:1.18.24")
     implementation("gradle.plugin.com.github.johnrengelman:shadow:7.1.2")
     implementation("gradle.plugin.com.github.monosoul:yadegrap:1.0.0")
     implementation("org.eclipse.jgit:org.eclipse.jgit:6.1.0.202203080745-r")

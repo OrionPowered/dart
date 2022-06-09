@@ -1,72 +1,67 @@
 package devtools;
 
-import com.alexsobiek.async.util.Lazy;
+
 import com.github.quillmc.tinymcp.TinyMCP;
+import devtools.GitManager;
 import devtools.task.ApplyPatchesTask;
+import devtools.task.DartTask;
 import devtools.task.GenPatchesTask;
 import devtools.task.GenSourcesTask;
+import lombok.Getter;
+import lombok.Setter;
+import org.gradle.api.Plugin;
 import org.gradle.api.Project;
-import org.slf4j.Logger;
 
 import java.io.File;
 
-public class DartPlugin implements org.gradle.api.Plugin<Project> {
+@Getter
+public class DartPlugin implements Plugin<Project> {
+    private Project project;
+    private DartExtension extension;
+    private GitManager gitManager;
+    @Setter
+    private TinyMCP mcp;
 
-    private static DartPlugin plugin;
-    private static DartExtension extension;
-    private static Logger logger;
-    private static final Lazy<Project> project = Lazy.delayed();
-    public static final Lazy<TinyMCP> tinymcp = Lazy.delayed();
-    private static final Lazy<File> patchDir = new Lazy<>(() -> new File(project.get().getProjectDir(), "patches"));
-    private static final Lazy<File> sourceDir = new Lazy<>(() -> new File(project.get().getProjectDir(), "src/main/java"));
-    private static final Lazy<File> resourceDir = new Lazy<>(() -> new File(project.get().getProjectDir(), "src/main/resources"));
+    private File gitDir;
+    private File patchDir;
+    private File sourceDir;
+    private File resourceDir;
+
 
     @Override
     public void apply(Project project) {
-        this.plugin = this;
-        this.project.set(project);
-        if (!patchDir.get().exists()) patchDir.get().mkdirs();
+        this.project = project;
+        System.setProperty("TINYMCP_CACHE", Constants.CACHE.resolve("tinymcp").toAbsolutePath().toString());
 
         extension = DartExtension.register(project);
-        GenSourcesTask.register(project);
-        GenPatchesTask.register(project);
-        ApplyPatchesTask.register(project);
+        setupDirectories();
+
+        gitManager = new GitManager(gitDir, patchDir);
+
+        registerTasks();
     }
 
-
-    public static Project getProject() {
-        return project.get();
+    private File file(String name) {
+        return new File(project.getProjectDir(), name);
     }
 
-    public static Logger getLogger() {
-        return logger;
+    private void setupDirectories() {
+        gitDir = file("src");
+
+        patchDir = file("patches");
+        if (!patchDir.exists()) patchDir.mkdirs();
+
+        sourceDir = file("src/main/java");
+        resourceDir = file("src/main/resources");
     }
 
-    public static DartExtension getExtension() {
-        return extension;
-    }
-
-    public static TinyMCP getTinyMCP() {
-        return tinymcp.get();
-    }
-
-    public static File getProjectDir() {
-        return project.get().getProjectDir();
-    }
-
-    public static File getSourceDir() {
-        return sourceDir.get();
-    }
-
-    public static File getResourceDir() {
-        return resourceDir.get();
-    }
-
-    public static File getPatchDir() {
-        return patchDir.get();
-    }
-
-    public static DartPlugin get() {
-        return plugin;
+    private void registerTasks() {
+        DartTask.register(this, "genSources", GenSourcesTask.class, task -> {
+            task.serverVersion = extension.getServerVersion();
+            task.sourcesDir = sourceDir;
+            task.resourcesDir = resourceDir;
+        });
+        DartTask.register(this, "genPatches", GenPatchesTask.class);
+        DartTask.register(this, "applyPatches", ApplyPatchesTask.class);
     }
 }

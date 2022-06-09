@@ -2,16 +2,12 @@ package devtools.task;
 
 import com.github.quillmc.tinymcp.TinyMCP;
 import com.github.quillmc.tinymcp.Version;
-import devtools.DartPlugin;
-import devtools.GitPatch;
+import devtools.task.DartTask;
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.util.getopt.Options;
 import org.benf.cfr.reader.util.getopt.OptionsImpl;
-import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
-import org.gradle.api.Project;
 import org.gradle.api.provider.Property;
-import org.gradle.api.tasks.TaskAction;
 
 import java.io.*;
 import java.util.List;
@@ -19,27 +15,26 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-public class GenSourcesTask extends DefaultTask {
-    public static void register(Project project) {
-        project.getTasks().register("genSources", GenSourcesTask.class);
-    }
+public class GenSourcesTask extends DartTask {
+    public Property<Version> serverVersion;
+    public File sourcesDir;
+    public File resourcesDir;
 
-    @TaskAction
+    @Override
     public void run() {
-        Property<Version> version = DartPlugin.getExtension().getServerVersion();
-        if (version.isPresent()) {
-            Version v = version.get();
+        if (serverVersion.isPresent()) {
+            Version v = serverVersion.get();
             System.out.println("Setting up development environment for Minecraft version " + v);
 
             TinyMCP mcp = v.server();
-            DartPlugin.tinymcp.setIfAbsent(mcp);
+            plugin.setMcp(mcp);
 
             File jar = mcp.getMappedJar();
 
-            File srcDir = DartPlugin.getSourceDir();
+            File srcDir = plugin.getSourceDir();
             if (srcDir.exists() || srcDir.mkdirs()) {
                 // decompile sources
-                extractResources(jar, DartPlugin.getResourceDir());
+                extractResources(jar, plugin.getResourceDir());
                 Options options = OptionsImpl.getFactory().create(Map.of(
                         "renameillegalidents", "true",
                         "outputdir", srcDir.getAbsolutePath()
@@ -50,7 +45,7 @@ public class GenSourcesTask extends DefaultTask {
                 File cfrSummary = new File(srcDir, "summary.txt");
                 if (cfrSummary.exists()) cfrSummary.delete();
 
-                GitPatch.setup();
+                plugin.getGitManager().setupGit();
             } else throw new GradleException("Failed to setup project sources at " + srcDir);
         }
     }
@@ -64,7 +59,8 @@ public class GenSourcesTask extends DefaultTask {
                     File output = new File(out, entry.getName());
                     System.out.println("Extracting " + entry.getName());
                     if (entry.isDirectory()) {
-                        if (!out.exists() && !out.mkdirs()) throw new IOException("Failed creating directory " + output);
+                        if (!out.exists() && !out.mkdirs())
+                            throw new IOException("Failed creating directory " + output);
                     } else if (!entry.getName().endsWith(".class")) {
                         if (output.getParentFile().exists() || output.getParentFile().mkdirs()) {
                             BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(output));
