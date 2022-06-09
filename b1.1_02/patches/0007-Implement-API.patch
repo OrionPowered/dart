@@ -1,0 +1,218 @@
+From f9e64c5c34348c368f8cfb0467b25300dcbc08b9 Mon Sep 17 00:00:00 2001
+From: Alex Sobiek <alex@alexsobiek.com>
+Date: Thu, 9 Jun 2022 04:23:51 -0500
+Subject: [PATCH] Implement API
+
+---
+ .../quillmc/dart/AbstractMinecraftServer.java | 42 +++++++++++++++++++
+ main/java/net/minecraft/NetLoginHandler.java  | 11 ++---
+ main/java/net/minecraft/NetServerHandler.java | 11 +++--
+ .../minecraft/ServerConfigurationManager.java | 17 ++++----
+ .../net/minecraft/server/MinecraftServer.java |  8 +++-
+ 5 files changed, 71 insertions(+), 18 deletions(-)
+ create mode 100644 main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
+
+diff --git a/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
+new file mode 100644
+index 0000000..b5bd8c8
+--- /dev/null
++++ b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
+@@ -0,0 +1,42 @@
++package com.github.quillmc.dart;
++
++import com.github.quillmc.dart.api.entity.Player;
++import com.github.quillmc.dart.chat.ChatColor;
++import net.minecraft.EntityPlayerMP;
++import net.minecraft.Packet3Chat;
++import net.minecraft.ServerConfigurationManager;
++
++import java.util.Optional;
++
++// Here lies the majority of API implementations
++public class AbstractMinecraftServer extends DartServer<Player> {
++    public ServerConfigurationManager configManager;
++
++    public Optional<EntityPlayerMP> getPlayer(String username) {
++        return configManager.playerEntities.stream().filter(e -> e.username.equals(username)).findFirst();
++    }
++
++    public boolean handleJoin(EntityPlayerMP player) {
++        boolean joined = super.handleJoin(player);
++        Packet3Chat joinMsg = new Packet3Chat("\u00a7e" + player.username + " joined the game.");
++        configManager.sendPacketToAllPlayers(joinMsg);
++        player.netServerHandler.sendPacket(joinMsg);
++        return joined;
++    }
++
++    public void handleLeave(EntityPlayerMP player) {
++        super.handleLeave(player);
++    }
++
++    public Optional<String> handleChat(EntityPlayerMP player, String chat) {
++        return super.handleChat(player, chat);
++    }
++
++    public void broadcast(String msg) {
++        broadcastPlain(String.format("%s[%sQuill%s]%s %s", ChatColor.DARK_GRAY, ChatColor.GOLD, ChatColor.DARK_GRAY, ChatColor.RESET, msg));
++    }
++
++    public void broadcastPlain(String msg) {
++        configManager.sendChatMessageToAllPlayers(msg);
++    }
++}
+diff --git a/main/java/net/minecraft/NetLoginHandler.java b/main/java/net/minecraft/NetLoginHandler.java
+index acfab40..4ecfa40 100644
+--- a/main/java/net/minecraft/NetLoginHandler.java
++++ b/main/java/net/minecraft/NetLoginHandler.java
+@@ -81,13 +81,14 @@ public class NetLoginHandler
+         if (entityPlayerMP != null) {
+             logger.info(this.getUserAndIPString() + " logged in with entity id " + entityPlayerMP.field_331_c);
+             NetServerHandler netServerHandler = new NetServerHandler(this.mcServer, this.netManager, entityPlayerMP);
++            // Dart - defer join logic to AbstractMinecraftServer
++            if (!mcServer.handleJoin(entityPlayerMP)) {
++                this.finishedProcessing = true;
++                return;
++            }
++            // End Dart
+             netServerHandler.sendPacket(new Packet1Login("", "", entityPlayerMP.field_331_c, this.mcServer.worldMngr.randomSeed, (byte)this.mcServer.worldMngr.worldProvider.worldType));
+             netServerHandler.sendPacket(new Packet6SpawnPosition(this.mcServer.worldMngr.spawnX, this.mcServer.worldMngr.spawnY, this.mcServer.worldMngr.spawnZ));
+-            // Start Dart - Send player join message as well
+-            Packet3Chat joinMsg = new Packet3Chat("\u00a7e" + entityPlayerMP.username + " joined the game.");
+-            this.mcServer.configManager.sendPacketToAllPlayers(joinMsg);
+-            netServerHandler.sendPacket(joinMsg);
+-            // End Dart
+             this.mcServer.configManager.playerLoggedIn(entityPlayerMP);
+             netServerHandler.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
+             this.mcServer.field_6036_c.func_4108_a(netServerHandler);
+diff --git a/main/java/net/minecraft/NetServerHandler.java b/main/java/net/minecraft/NetServerHandler.java
+index 3d9fe4d..b19964f 100644
+--- a/main/java/net/minecraft/NetServerHandler.java
++++ b/main/java/net/minecraft/NetServerHandler.java
+@@ -311,9 +311,14 @@ implements ICommandListener {
+         if (string.startsWith("/")) {
+             this.func_4010_d(string);
+         } else {
+-            string = "<" + this.playerEntity.username + "> " + string;
+-            logger.info(string);
+-            this.mcServer.configManager.sendPacketToAllPlayers(new Packet3Chat(string));
++            // Dart - defer chat logic
++            mcServer.handleChat(this.playerEntity, string).ifPresent(msg -> {
++                //string = "<" + this.playerEntity.username + "> " + string;
++                logger.info(msg);
++                this.mcServer.configManager.sendPacketToAllPlayers(new Packet3Chat(msg));
++            });
++            // End dart
++
+         }
+     }
+ 
+diff --git a/main/java/net/minecraft/ServerConfigurationManager.java b/main/java/net/minecraft/ServerConfigurationManager.java
+index 7cecbc5..7b11ad5 100644
+--- a/main/java/net/minecraft/ServerConfigurationManager.java
++++ b/main/java/net/minecraft/ServerConfigurationManager.java
+@@ -18,11 +18,11 @@ import net.minecraft.server.MinecraftServer;
+ 
+ public class ServerConfigurationManager {
+     public static Logger logger = Logger.getLogger("Minecraft");
+-    public List playerEntities = new ArrayList();
++    public List<EntityPlayerMP> playerEntities = new ArrayList();
+     private MinecraftServer mcServer;
+     private PlayerManager playerManagerObj;
+     private int maxPlayers;
+-    private Set<String> field_9252_f = new HashSet<>();
++    private Set<String> bannedPlayers = new HashSet<>();
+     private Set<String> bannedIPs = new HashSet<>();
+     private Set<String> ops = new HashSet<>();
+     private File bannedPlayersFile;
+@@ -73,10 +73,11 @@ public class ServerConfigurationManager {
+         this.mcServer.worldMngr.func_20109_d(entityPlayerMP);
+         this.playerEntities.remove(entityPlayerMP);
+         this.playerManagerObj.func_9213_b(entityPlayerMP);
++        mcServer.handleLeave(entityPlayerMP); // Dart - handle player leave
+     }
+ 
+     public EntityPlayerMP login(NetLoginHandler netLoginHandler, String string, String string2) {
+-        if (this.field_9252_f.contains(string.trim().toLowerCase())) {
++        if (this.bannedPlayers.contains(string.trim().toLowerCase())) {
+             netLoginHandler.kickUser("You are banned from this server!");
+             return null;
+         }
+@@ -147,22 +148,22 @@ public class ServerConfigurationManager {
+     }
+ 
+     public void banPlayer(String string) {
+-        this.field_9252_f.add(string.toLowerCase());
++        this.bannedPlayers.add(string.toLowerCase());
+         this.writeBannedPlayers();
+     }
+ 
+     public void unbanPlayer(String string) {
+-        this.field_9252_f.remove(string.toLowerCase());
++        this.bannedPlayers.remove(string.toLowerCase());
+         this.writeBannedPlayers();
+     }
+ 
+     private void readBannedPlayers() {
+         try {
+-            this.field_9252_f.clear();
++            this.bannedPlayers.clear();
+             BufferedReader bufferedReader = new BufferedReader(new FileReader(this.bannedPlayersFile));
+             String string = "";
+             while ((string = bufferedReader.readLine()) != null) {
+-                this.field_9252_f.add(string.trim().toLowerCase());
++                this.bannedPlayers.add(string.trim().toLowerCase());
+             }
+             bufferedReader.close();
+         }
+@@ -174,7 +175,7 @@ public class ServerConfigurationManager {
+     private void writeBannedPlayers() {
+         try {
+             PrintWriter printWriter = new PrintWriter(new FileWriter(this.bannedPlayersFile, false));
+-            for (String string : this.field_9252_f) {
++            for (String string : this.bannedPlayers) {
+                 printWriter.println(string);
+             }
+             printWriter.close();
+diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
+index 510c39e..8be695e 100644
+--- a/main/java/net/minecraft/server/MinecraftServer.java
++++ b/main/java/net/minecraft/server/MinecraftServer.java
+@@ -14,6 +14,9 @@ import java.util.HashMap;
+ import java.util.List;
+ import java.util.logging.Level;
+ import java.util.logging.Logger;
++
++import com.github.quillmc.dart.AbstractMinecraftServer;
++import com.github.quillmc.dart.DartServer;
+ import net.minecraft.AxisAlignedBB;
+ import net.minecraft.ConsoleLogManager;
+ import net.minecraft.EntityPlayerMP;
+@@ -36,7 +39,7 @@ import net.minecraft.Vec3D;
+ import net.minecraft.WorldManager;
+ import net.minecraft.WorldServer;
+ 
+-public class MinecraftServer
++public class MinecraftServer extends AbstractMinecraftServer
+ implements ICommandListener,
+ Runnable {
+     public static Logger logger = Logger.getLogger("Minecraft");
+@@ -44,7 +47,7 @@ Runnable {
+     public NetworkListenThread field_6036_c;
+     public PropertyManager propertyManagerObj;
+     public WorldServer worldMngr;
+-    public ServerConfigurationManager configManager;
++    // public ServerConfigurationManager configManager; // Dart - moved to parent class
+     private boolean field_6025_n = true;
+     public boolean field_6032_g = false;
+     int deathTime = 0;
+@@ -62,6 +65,7 @@ Runnable {
+     }
+ 
+     private boolean start() {
++        super.preStart();
+         ThreadCommandReader threadCommandReader = new ThreadCommandReader(this);
+         threadCommandReader.setDaemon(true);
+         threadCommandReader.start();
+-- 
+2.36.1
+
