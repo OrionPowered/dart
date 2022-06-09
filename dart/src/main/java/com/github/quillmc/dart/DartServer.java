@@ -41,7 +41,6 @@ public abstract class DartServer<P extends Player> implements Server<P> {
     @SneakyThrows
     protected Optional<String> handleChat(P player, String chat) {
         PlayerChatEvent<P> e = getEventBus().post(new PlayerChatEvent<>(player, chat)).get();
-        broadcast("test");
         if (e.isCancelled()) return Optional.empty();
         else return Optional.of(chatFormatter.format(player, chat));
     }
