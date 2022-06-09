@@ -1,4 +1,4 @@
-From f9e64c5c34348c368f8cfb0467b25300dcbc08b9 Mon Sep 17 00:00:00 2001
+From 922e2c7f9f427a9e675730e50d0de808ab55b37a Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Thu, 9 Jun 2022 04:23:51 -0500
 Subject: [PATCH] Implement API
@@ -14,14 +14,14 @@ Subject: [PATCH] Implement API
 
 diff --git a/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 new file mode 100644
-index 0000000..b5bd8c8
+index 0000000..12369dd
 --- /dev/null
 +++ b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 @@ -0,0 +1,42 @@
 +package com.github.quillmc.dart;
 +
 +import com.github.quillmc.dart.api.entity.Player;
-+import com.github.quillmc.dart.chat.ChatColor;
++import com.github.quillmc.dart.api.chat.ChatColor;
 +import net.minecraft.EntityPlayerMP;
 +import net.minecraft.Packet3Chat;
 +import net.minecraft.ServerConfigurationManager;
