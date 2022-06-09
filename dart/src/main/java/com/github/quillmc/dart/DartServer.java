@@ -7,7 +7,7 @@ import com.github.quillmc.dart.api.entity.Player;
 import com.github.quillmc.dart.api.event.PlayerChatEvent;
 import com.github.quillmc.dart.api.event.PlayerJoinEvent;
 import com.github.quillmc.dart.api.event.PlayerLeaveEvent;
-import com.github.quillmc.dart.chat.ChatFormatter;
+import com.github.quillmc.dart.api.chat.ChatFormatter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;

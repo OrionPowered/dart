@@ -2,7 +2,7 @@ package com.github.quillmc.dart.api;
 
 import com.alexsobiek.async.event.EventBus;
 import com.github.quillmc.dart.api.entity.Player;
-import com.github.quillmc.dart.chat.ChatFormatter;
+import com.github.quillmc.dart.api.chat.ChatFormatter;
 
 import java.util.Optional;
 

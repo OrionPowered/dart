@@ -11,5 +11,6 @@ dart {
 }
 
 dependencies {
+    api(project(":api"))
     implementation(project(":dart"))
 }

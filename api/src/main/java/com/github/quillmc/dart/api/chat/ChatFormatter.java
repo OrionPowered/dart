@@ -1,4 +1,4 @@
-package com.github.quillmc.dart.chat;
+package com.github.quillmc.dart.api.chat;
 
 import com.github.quillmc.dart.api.entity.Player;
 
