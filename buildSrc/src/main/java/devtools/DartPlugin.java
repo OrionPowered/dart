@@ -2,6 +2,7 @@ package devtools;
 
 import com.alexsobiek.async.util.Lazy;
 import com.github.quillmc.tinymcp.TinyMCP;
+import devtools.task.ApplyPatchesTask;
 import devtools.task.GenPatchesTask;
 import devtools.task.GenSourcesTask;
 import org.gradle.api.Project;
@@ -29,6 +30,7 @@ public class DartPlugin implements org.gradle.api.Plugin<Project> {
         extension = DartExtension.register(project);
         GenSourcesTask.register(project);
         GenPatchesTask.register(project);
+        ApplyPatchesTask.register(project);
     }
 
 
