@@ -15,4 +15,4 @@ pluginManagement {
     }
 }
 
-include("b1.1_02", "api");
+include("b1.1_02", "b1.2_01", "api");
