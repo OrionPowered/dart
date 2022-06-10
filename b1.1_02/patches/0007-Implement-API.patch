@@ -105,7 +105,7 @@ index 22c6c79..a346297 100644
  import net.minecraft.World;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public class Chunk {
 +    private static Logger logger = LoggerFactory.getLogger("Chunk");
      public static boolean field_694_a;
@@ -139,13 +139,13 @@ index a790d9b..91e5bc9 100644
  import net.minecraft.World;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public class ChunkLoader
  implements IChunkLoader {
 +    private static final Logger logger = LoggerFactory.getLogger("ChunkLoader");
      private File field_945_a;
      private boolean field_944_b;
- 
+
 @@ -59,16 +62,16 @@ implements IChunkLoader {
                  FileInputStream fileInputStream = new FileInputStream(file);
                  NBTTagCompound nBTTagCompound = CompressedStreamTools.func_770_a(fileInputStream);
@@ -188,13 +188,13 @@ index f380bab..8601eba 100644
 +
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public class CraftingManager {
 +    private static Logger logger = LoggerFactory.getLogger("CraftingManager");
      private static final CraftingManager field_20155_a = new CraftingManager();
 -    private List field_20154_b = new ArrayList();
 +    private List<CraftingRecipe> recipes = new ArrayList();
- 
+
      public static final CraftingManager func_20151_a() {
          return field_20155_a;
 @@ -34,52 +27,52 @@ public class CraftingManager {
@@ -288,7 +288,7 @@ index f380bab..8601eba 100644
 +        Collections.sort(this.recipes, new RecipeSorter(this));
 +        logger.info("Loaded {} recipes", this.recipes.size());
      }
- 
+
 -    void func_20153_a(ItemStack itemStack, Object ... objectArray) {
 +    void add(ItemStack itemStack, Object ... objectArray) {
          Object object;
@@ -301,7 +301,7 @@ index f380bab..8601eba 100644
 -        this.field_20154_b.add(new CraftingRecipe(n2, n3, nArray, itemStack));
 +        this.recipes.add(new CraftingRecipe(n2, n3, nArray, itemStack));
      }
- 
+
      public ItemStack func_20152_a(int[] nArray) {
 -        for (int i = 0; i < this.field_20154_b.size(); ++i) {
 -            CraftingRecipe craftingRecipe = (CraftingRecipe)this.field_20154_b.get(i);
@@ -320,7 +320,7 @@ index f14804c..c20d8d5 100644
  import net.minecraft.World;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public class EntityList {
 +    private static Logger logger = LoggerFactory.getLogger("EntityList");
      private static Map field_849_a = new HashMap();
@@ -344,7 +344,7 @@ index a341bdf..2974f7f 100644
  import java.util.logging.LogRecord;
  import javax.swing.JTextArea;
 -import net.minecraft.GuiLogFormatter;
- 
+
  public class GuiLogOutputHandler
  extends Handler {
      private int[] field_998_b = new int[1024];
@@ -353,18 +353,18 @@ index a341bdf..2974f7f 100644
 -    private JTextArea field_1000_d;
 +    Formatter formatter = new GuiLogFormatter(this);
 +    private JTextArea textArea;
- 
+
      public GuiLogOutputHandler(JTextArea jTextArea) {
 -        this.setFormatter(this.field_999_a);
 -        this.field_1000_d = jTextArea;
 +        this.setFormatter(this.formatter);
 +        this.textArea = jTextArea;
      }
- 
+
      public void close() {
 @@ -28,12 +27,12 @@ extends Handler {
      }
- 
+
      public void publish(LogRecord logRecord) {
 -        int n = this.field_1000_d.getDocument().getLength();
 -        this.field_1000_d.append(this.field_999_a.format(logRecord));
@@ -386,15 +386,15 @@ index acfab40..6cdbdd2 100644
 +++ b/main/java/net/minecraft/NetLoginHandler.java
 @@ -4,14 +4,16 @@
  package net.minecraft;
- 
+
  import net.minecraft.server.MinecraftServer;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  import java.net.Socket;
  import java.util.Random;
 -import java.util.logging.Logger;
- 
+
  public class NetLoginHandler
          extends NetHandler {
 -    public static Logger logger = Logger.getLogger("Minecraft");
@@ -431,7 +431,7 @@ index 3d9fe4d..c249a27 100644
 @@ -3,27 +3,29 @@
   */
  package net.minecraft;
- 
+
 +import net.minecraft.server.MinecraftServer;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
@@ -442,7 +442,7 @@ index 3d9fe4d..c249a27 100644
 -import java.util.logging.Logger;
 -
 -import net.minecraft.server.MinecraftServer;
- 
+
  public class NetServerHandler
 -extends NetHandler
 -implements ICommandListener {
@@ -463,7 +463,7 @@ index 3d9fe4d..c249a27 100644
      private boolean field_9006_j = true;
 -    private Map field_10_k = new HashMap();
 +    private final Map field_10_k = new HashMap();
- 
+
      public NetServerHandler(MinecraftServer minecraftServer, NetworkManager networkManager, EntityPlayerMP entityPlayerMP) {
          this.mcServer = minecraftServer;
 @@ -114,7 +116,7 @@ implements ICommandListener {
@@ -495,7 +495,7 @@ index 3d9fe4d..c249a27 100644
 -        this.playerEntity.netServerHandler.sendPacket(new Packet13PlayerLookMove(d, d2 + (double)1.62f, d2, d3, f, f2, false));
 +        this.playerEntity.netServerHandler.sendPacket(new Packet13PlayerLookMove(d, d2 + (double) 1.62f, d2, d3, f, f2, false));
      }
- 
+
      public void handleBlockDig(Packet14BlockDig packet14BlockDig) {
 @@ -177,10 +179,7 @@ implements ICommandListener {
              return;
@@ -555,13 +555,13 @@ index 3d9fe4d..c249a27 100644
              if (n > 16 || bl) {
 @@ -284,7 +283,7 @@ implements ICommandListener {
      }
- 
+
      public void func_6001_a(Packet packet) {
 -        logger.warning(this.getClass() + " wasn't prepared to deal with a " + packet.getClass());
 +        logger.warn("{} wasn't prepared to deal with a {}", this.getClass(), packet.getClass());
          this.disconnect("Protocol error, unexpected packet");
      }
- 
+
 @@ -311,9 +310,14 @@ implements ICommandListener {
          if (string.startsWith("/")) {
              this.func_4010_d(string);
@@ -579,15 +579,15 @@ index 3d9fe4d..c249a27 100644
 +
          }
      }
- 
+
 @@ -356,7 +360,7 @@ implements ICommandListener {
      }
- 
+
      public void handleKickDisconnect(Packet255KickDisconnect packet255KickDisconnect) {
 -        this.netManager.networkShutdown("disconnect.quitting", new Object[0]);
 +        this.netManager.networkShutdown("disconnect.quitting");
      }
- 
+
      public int func_38_b() {
 @@ -408,7 +412,7 @@ implements ICommandListener {
                  this.playerEntity.field_20052_ap.func_20129_a(this.playerEntity, false);
@@ -600,7 +600,7 @@ index 3d9fe4d..c249a27 100644
              }
 @@ -416,7 +420,7 @@ implements ICommandListener {
      }
- 
+
      public void func_20008_a(Packet106 packet106) {
 -        Short s = (Short)this.field_10_k.get(this.playerEntity.field_20052_ap.field_20134_f);
 +        Short s = (Short) this.field_10_k.get(this.playerEntity.field_20052_ap.field_20134_f);
@@ -646,7 +646,7 @@ index b2839a4..b964778 100644
 @@ -3,29 +3,31 @@
   */
  package net.minecraft;
- 
+
 +import net.minecraft.server.MinecraftServer;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
@@ -659,7 +659,7 @@ index b2839a4..b964778 100644
 -import java.util.logging.Logger;
 -
 -import net.minecraft.server.MinecraftServer;
- 
+
  public class NetworkListenThread {
 -    public static Logger logger = Logger.getLogger("Minecraft");
 +    public static Logger logger = LoggerFactory.getLogger("NetworkListener");
@@ -674,7 +674,7 @@ index b2839a4..b964778 100644
 +    private final ArrayList field_976_g = new ArrayList();
 +    private final ArrayList field_975_h = new ArrayList();
      public MinecraftServer mcServer;
- 
+
      public NetworkListenThread(MinecraftServer minecraftServer, InetAddress inetAddress, int n) throws IOException {
          this.mcServer = minecraftServer;
 -        this.serverSocket = new ServerSocket(n, 0, inetAddress);
@@ -724,13 +724,13 @@ index b2839a4..b964778 100644
              this.field_975_h.remove(n--);
          }
      }
- 
+
 -    static /* synthetic */ ServerSocket func_713_a(NetworkListenThread networkListenThread) {
 -        return networkListenThread.serverSocket;
 +    /* synthetic */ ServerSocket func_713_a(NetworkListenThread networkListenThread) {
 +        return serverSocket;
      }
- 
+
      static /* synthetic */ int func_712_b(NetworkListenThread networkListenThread) {
 diff --git a/main/java/net/minecraft/Packet.java b/main/java/net/minecraft/Packet.java
 index cf97b85..e6eff59 100644
@@ -742,7 +742,7 @@ index cf97b85..e6eff59 100644
  import net.minecraft.Packet9;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public abstract class Packet {
 +    private static Logger logger = LoggerFactory.getLogger("Packet");
      private static Map packetIdToClassMap = new HashMap();
@@ -777,7 +777,7 @@ index 079c8ec..4f2cfcc 100644
 @@ -3,17 +3,17 @@
   */
  package net.minecraft;
- 
+
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
 +
@@ -788,14 +788,14 @@ index 079c8ec..4f2cfcc 100644
 -import net.minecraft.CompressedStreamTools;
 -import net.minecraft.EntityPlayerMP;
 -import net.minecraft.NBTTagCompound;
- 
+
  public class PlayerNBTManager {
 -    public static Logger logger = Logger.getLogger("Minecraft");
 -    private File worldFile;
 +    public static Logger logger = LoggerFactory.getLogger("PlayerNBTManager");
 +    //public static Logger logger = Logger.getLogger("Minecraft");
 +    private final File worldFile;
- 
+
      public PlayerNBTManager(File file) {
          this.worldFile = file;
 @@ -31,9 +31,8 @@ public class PlayerNBTManager {
@@ -809,7 +809,7 @@ index 079c8ec..4f2cfcc 100644
 +            logger.warn("Failed to save player data for {}", entityPlayerMP.username);
          }
      }
- 
+
 @@ -44,9 +43,8 @@ public class PlayerNBTManager {
              if (file.exists() && (nBTTagCompound = CompressedStreamTools.func_770_a(new FileInputStream(file))) != null) {
                  entityPlayerMP.readFromNBT(nBTTagCompound);
@@ -829,7 +829,7 @@ index 8d25477..fbf792e 100644
 @@ -3,15 +3,18 @@
   */
  package net.minecraft;
- 
+
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
 +
@@ -839,14 +839,14 @@ index 8d25477..fbf792e 100644
  import java.util.Properties;
  import java.util.logging.Level;
 -import java.util.logging.Logger;
- 
+
  public class PropertyManager {
 -    public static Logger logger = Logger.getLogger("Minecraft");
 +    public static Logger logger = LoggerFactory.getLogger("PropertyManager");
 +    //public static Logger logger = Logger.getLogger("Minecraft");
      private Properties serverProperties = new Properties();
      private File serverPropertiesFile;
- 
+
 @@ -22,17 +25,17 @@ public class PropertyManager {
                  this.serverProperties.load(new FileInputStream(file));
              }
@@ -861,13 +861,13 @@ index 8d25477..fbf792e 100644
              this.generateNewProperties();
          }
      }
- 
+
      public void generateNewProperties() {
 -        logger.log(Level.INFO, "Generating new properties file");
 +        logger.info("Generating new properties file");
          this.saveProperties();
      }
- 
+
 @@ -41,7 +44,7 @@ public class PropertyManager {
              this.serverProperties.store(new FileOutputStream(this.serverPropertiesFile), "Minecraft server properties");
          }
@@ -884,7 +884,7 @@ index 26157e7..d35127c 100644
 @@ -3,11 +3,6 @@
   */
  package net.minecraft;
- 
+
 -import net.minecraft.Block;
 -import net.minecraft.CraftingManager;
 -import net.minecraft.Item;
@@ -909,7 +909,7 @@ index d28167f..686a7c1 100644
 @@ -3,15 +3,11 @@
   */
  package net.minecraft;
- 
+
 -import net.minecraft.Block;
 -import net.minecraft.CraftingManager;
 -import net.minecraft.ItemStack;
@@ -924,7 +924,7 @@ index d28167f..686a7c1 100644
 +        craftingManager.add(new ItemStack(Block.workbench), "##", "##", Character.valueOf('#'), Block.planks);
      }
  }
- 
+
 diff --git a/main/java/net/minecraft/RecipesFood.java b/main/java/net/minecraft/RecipesFood.java
 index e18beea..7a26b45 100644
 --- a/main/java/net/minecraft/RecipesFood.java
@@ -932,7 +932,7 @@ index e18beea..7a26b45 100644
 @@ -3,15 +3,10 @@
   */
  package net.minecraft;
- 
+
 -import net.minecraft.Block;
 -import net.minecraft.CraftingManager;
 -import net.minecraft.Item;
@@ -946,7 +946,7 @@ index e18beea..7a26b45 100644
 +        craftingManager.add(new ItemStack(Item.bowlSoup), "Y", "X", "#", Character.valueOf('X'), Block.mushroomRed, Character.valueOf('Y'), Block.mushroomBrown, Character.valueOf('#'), Item.bowlEmpty);
      }
  }
- 
+
 diff --git a/main/java/net/minecraft/RecipesIngots.java b/main/java/net/minecraft/RecipesIngots.java
 index 6f1339e..959025a 100644
 --- a/main/java/net/minecraft/RecipesIngots.java
@@ -954,7 +954,7 @@ index 6f1339e..959025a 100644
 @@ -3,11 +3,6 @@
   */
  package net.minecraft;
- 
+
 -import net.minecraft.Block;
 -import net.minecraft.CraftingManager;
 -import net.minecraft.Item;
@@ -962,7 +962,7 @@ index 6f1339e..959025a 100644
 -
  public class RecipesIngots {
      private Object[][] field_20160_a = new Object[][]{{Block.blockGold, Item.ingotGold}, {Block.blockSteel, Item.ingotIron}, {Block.blockDiamond, Item.diamond}};
- 
+
 @@ -15,8 +10,8 @@ public class RecipesIngots {
          for (int i = 0; i < this.field_20160_a.length; ++i) {
              Block block = (Block)this.field_20160_a[i][0];
@@ -981,7 +981,7 @@ index 99463f3..a98020c 100644
 @@ -3,11 +3,6 @@
   */
  package net.minecraft;
- 
+
 -import net.minecraft.Block;
 -import net.minecraft.CraftingManager;
 -import net.minecraft.Item;
@@ -1006,7 +1006,7 @@ index 495fc1e..e429ad9 100644
 @@ -3,11 +3,6 @@
   */
  package net.minecraft;
- 
+
 -import net.minecraft.Block;
 -import net.minecraft.CraftingManager;
 -import net.minecraft.Item;
@@ -1029,7 +1029,7 @@ index 495fc1e..e429ad9 100644
 +        craftingManager.add(new ItemStack(Item.arrow, 4), "X", "#", "Y", Character.valueOf('Y'), Item.feather, Character.valueOf('X'), Item.flint, Character.valueOf('#'), Item.stick);
      }
  }
- 
+
 diff --git a/main/java/net/minecraft/ServerConfigurationManager.java b/main/java/net/minecraft/ServerConfigurationManager.java
 index 7cecbc5..a856d6b 100644
 --- a/main/java/net/minecraft/ServerConfigurationManager.java
@@ -1037,7 +1037,7 @@ index 7cecbc5..a856d6b 100644
 @@ -3,26 +3,24 @@
   */
  package net.minecraft;
- 
+
 -import java.io.BufferedReader;
 -import java.io.File;
 -import java.io.FileReader;
@@ -1055,7 +1055,7 @@ index 7cecbc5..a856d6b 100644
 -import java.util.logging.Logger;
 -
 -import net.minecraft.server.MinecraftServer;
- 
+
  public class ServerConfigurationManager {
 -    public static Logger logger = Logger.getLogger("Minecraft");
 -    public List playerEntities = new ArrayList();
@@ -1076,7 +1076,7 @@ index 7cecbc5..a856d6b 100644
          this.playerManagerObj.func_9213_b(entityPlayerMP);
 +        mcServer.handleLeave(entityPlayerMP); // Dart - handle player leave
      }
- 
+
      public EntityPlayerMP login(NetLoginHandler netLoginHandler, String string, String string2) {
 -        if (this.field_9252_f.contains(string.trim().toLowerCase())) {
 +        if (this.bannedPlayers.contains(string.trim().toLowerCase())) {
@@ -1085,19 +1085,19 @@ index 7cecbc5..a856d6b 100644
          }
 @@ -147,40 +146,40 @@ public class ServerConfigurationManager {
      }
- 
+
      public void banPlayer(String string) {
 -        this.field_9252_f.add(string.toLowerCase());
 +        this.bannedPlayers.add(string.toLowerCase());
          this.writeBannedPlayers();
      }
- 
+
      public void unbanPlayer(String string) {
 -        this.field_9252_f.remove(string.toLowerCase());
 +        this.bannedPlayers.remove(string.toLowerCase());
          this.writeBannedPlayers();
      }
- 
+
      private void readBannedPlayers() {
          try {
 -            this.field_9252_f.clear();
@@ -1115,7 +1115,7 @@ index 7cecbc5..a856d6b 100644
 +            logger.warn("Failed to load ban list: ", exception);
          }
      }
- 
+
      private void writeBannedPlayers() {
          try {
              PrintWriter printWriter = new PrintWriter(new FileWriter(this.bannedPlayersFile, false));
@@ -1130,7 +1130,7 @@ index 7cecbc5..a856d6b 100644
 +            logger.warn("Failed to save ban list: ", exception);
          }
      }
- 
+
 @@ -205,7 +204,7 @@ public class ServerConfigurationManager {
              bufferedReader.close();
          }
@@ -1139,7 +1139,7 @@ index 7cecbc5..a856d6b 100644
 +            logger.warn("Failed to load ip ban list: ", exception);
          }
      }
- 
+
 @@ -218,7 +217,7 @@ public class ServerConfigurationManager {
              printWriter.close();
          }
@@ -1148,7 +1148,7 @@ index 7cecbc5..a856d6b 100644
 +            logger.warn("Failed to save ip ban list: ", exception);
          }
      }
- 
+
 @@ -243,7 +242,7 @@ public class ServerConfigurationManager {
              bufferedReader.close();
          }
@@ -1157,7 +1157,7 @@ index 7cecbc5..a856d6b 100644
 +            logger.warn("Failed to load ip ban list: ", exception);
          }
      }
- 
+
 @@ -256,7 +255,7 @@ public class ServerConfigurationManager {
              printWriter.close();
          }
@@ -1166,7 +1166,7 @@ index 7cecbc5..a856d6b 100644
 +            logger.warn("Failed to save ip ban list: ", exception);
          }
      }
- 
+
 diff --git a/main/java/net/minecraft/TileEntity.java b/main/java/net/minecraft/TileEntity.java
 index 2175b1b..3607e8b 100644
 --- a/main/java/net/minecraft/TileEntity.java
@@ -1177,7 +1177,7 @@ index 2175b1b..3607e8b 100644
  import net.minecraft.World;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public class TileEntity {
 +    private static Logger logger = LoggerFactory.getLogger("TileEntity");
      private static Map nameToClassMap = new HashMap();
@@ -1202,7 +1202,7 @@ index b1db2cb..20baf67 100644
  import net.minecraft.WorldProviderHell;
 +import org.slf4j.Logger;
 +import org.slf4j.LoggerFactory;
- 
+
  public class World
  implements IBlockAccess {
 +    private static final Logger logger = LoggerFactory.getLogger("World");
@@ -1259,7 +1259,7 @@ index 510c39e..afe58be 100644
 @@ -36,15 +39,15 @@ import net.minecraft.Vec3D;
  import net.minecraft.WorldManager;
  import net.minecraft.WorldServer;
- 
+
 -public class MinecraftServer
 +public class MinecraftServer extends AbstractMinecraftServer
  implements ICommandListener,
@@ -1277,7 +1277,7 @@ index 510c39e..afe58be 100644
      int deathTime = 0;
 @@ -62,14 +65,15 @@ Runnable {
      }
- 
+
      private boolean start() {
 +        super.preStart();
          ThreadCommandReader threadCommandReader = new ThreadCommandReader(this);
@@ -1335,7 +1335,7 @@ index 510c39e..afe58be 100644
 -        System.out.println(string + ": " + n + "%");
 +        logger.info("{}: {}%", string, n);
      }
- 
+
      private void func_6011_e() {
 @@ -173,11 +177,11 @@ Runnable {
                      long l3 = System.currentTimeMillis();
@@ -1368,7 +1368,7 @@ index 510c39e..afe58be 100644
 +            logger.warn("Unexpected exception while parsing console command", exception);
          }
      }
- 
+
 @@ -476,13 +480,14 @@ Runnable {
      public static void main(String[] stringArray) {
          try {
@@ -1387,7 +1387,7 @@ index 510c39e..afe58be 100644
 +            logger.warn("Failed to start the minecraft server", exception);
          }
      }
- 
--- 
+
+--
 2.36.1
 
