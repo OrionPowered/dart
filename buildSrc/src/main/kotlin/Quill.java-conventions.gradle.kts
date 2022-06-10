@@ -13,8 +13,8 @@ java.sourceCompatibility = JavaVersion.VERSION_17
 java.targetCompatibility = JavaVersion.VERSION_17
 
 dependencies{
-    compileOnly("org.projectlombok:lombok:1.18.22")
-    annotationProcessor("org.projectlombok:lombok:1.18.22")
+    compileOnly("org.projectlombok:lombok:${project.property("lombok_version")}")
+    annotationProcessor("org.projectlombok:lombok:${project.property("lombok_version")}")
 }
 
 
