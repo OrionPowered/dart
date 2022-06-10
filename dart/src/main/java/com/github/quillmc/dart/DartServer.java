@@ -8,19 +8,27 @@ import com.github.quillmc.dart.api.event.PlayerChatEvent;
 import com.github.quillmc.dart.api.event.PlayerJoinEvent;
 import com.github.quillmc.dart.api.event.PlayerLeaveEvent;
 import com.github.quillmc.dart.api.chat.ChatFormatter;
+import com.github.quillmc.dart.plugin.PluginLoader;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
 @Setter
 @Getter
 public abstract class DartServer<P extends Player> implements Server<P> {
+    protected static final Logger logger = LoggerFactory.getLogger("Dart");
     private final AsyncUtility async = AsyncUtility.builder().build();
     private ChatFormatter<P> chatFormatter = (ChatFormatter<P>) ChatFormatter.DEFAULT;
+    private PluginLoader pluginLoader;
 
+    @SneakyThrows
     public void preStart() {
+        logger.info("Starting Dart");
+        pluginLoader = new PluginLoader(this);
     }
 
     @Override

@@ -15,4 +15,4 @@ pluginManagement {
     }
 }
 
-include("dart", "api", "b1.1_02", "b1.2_01");
+include("dart", "api", "b1.1_02", "b1.2_01", "test-plugin");
