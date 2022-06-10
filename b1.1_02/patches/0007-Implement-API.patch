@@ -1,15 +1,37 @@
-From 922e2c7f9f427a9e675730e50d0de808ab55b37a Mon Sep 17 00:00:00 2001
+From 884d6d15a1c752116e26a139abdcc64e58fe89fc Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Thu, 9 Jun 2022 04:23:51 -0500
 Subject: [PATCH] Implement API
 
 ---
- .../quillmc/dart/AbstractMinecraftServer.java | 42 +++++++++++++++++++
- main/java/net/minecraft/NetLoginHandler.java  | 11 ++---
- main/java/net/minecraft/NetServerHandler.java | 11 +++--
- .../minecraft/ServerConfigurationManager.java | 17 ++++----
- .../net/minecraft/server/MinecraftServer.java |  8 +++-
- 5 files changed, 71 insertions(+), 18 deletions(-)
+ .../quillmc/dart/AbstractMinecraftServer.java |  42 +++++++
+ main/java/net/minecraft/BlockPortal.java      |   2 +-
+ main/java/net/minecraft/Chunk.java            |   7 +-
+ main/java/net/minecraft/ChunkLoader.java      |   9 +-
+ main/java/net/minecraft/CraftingManager.java  | 111 ++++++++----------
+ main/java/net/minecraft/EntityList.java       |   5 +-
+ .../net/minecraft/GuiLogOutputHandler.java    |  19 ++-
+ main/java/net/minecraft/NetLoginHandler.java  |  19 +--
+ main/java/net/minecraft/NetServerHandler.java |  73 ++++++------
+ .../net/minecraft/NetworkAcceptThread.java    |   2 +-
+ .../net/minecraft/NetworkListenThread.java    |  50 ++++----
+ main/java/net/minecraft/Packet.java           |   5 +-
+ main/java/net/minecraft/PlayerInstance.java   |   2 +-
+ main/java/net/minecraft/PlayerNBTManager.java |  22 ++--
+ main/java/net/minecraft/PropertyManager.java  |  15 ++-
+ main/java/net/minecraft/RecipesArmor.java     |   7 +-
+ main/java/net/minecraft/RecipesCrafting.java  |  10 +-
+ main/java/net/minecraft/RecipesFood.java      |   9 +-
+ main/java/net/minecraft/RecipesIngots.java    |   9 +-
+ main/java/net/minecraft/RecipesTools.java     |   7 +-
+ main/java/net/minecraft/RecipesWeapons.java   |  11 +-
+ .../minecraft/ServerConfigurationManager.java |  45 ++++---
+ main/java/net/minecraft/TileEntity.java       |   5 +-
+ main/java/net/minecraft/World.java            |   5 +-
+ .../net/minecraft/WorldGenLightStone1.java    |   1 -
+ .../net/minecraft/WorldGenLightStone2.java    |   1 -
+ .../net/minecraft/server/MinecraftServer.java |  51 ++++----
+ 27 files changed, 289 insertions(+), 255 deletions(-)
  create mode 100644 main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 
 diff --git a/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
@@ -60,35 +82,487 @@ index 0000000..12369dd
 +        configManager.sendChatMessageToAllPlayers(msg);
 +    }
 +}
+diff --git a/main/java/net/minecraft/BlockPortal.java b/main/java/net/minecraft/BlockPortal.java
+index a8dc42f..5eac8ef 100644
+--- a/main/java/net/minecraft/BlockPortal.java
++++ b/main/java/net/minecraft/BlockPortal.java
+@@ -49,7 +49,7 @@ extends BlockBreakable {
+         if (world.getBlockId(n, n2, n3 - 1) == Block.obsidian.blockID || world.getBlockId(n, n2, n3 + 1) == Block.obsidian.blockID) {
+             n7 = 1;
+         }
+-        System.out.println(n6 + ", " + n7);
++        // System.out.println(n6 + ", " + n7);
+         if (n6 == n7) {
+             return false;
+         }
+diff --git a/main/java/net/minecraft/Chunk.java b/main/java/net/minecraft/Chunk.java
+index 22c6c79..a346297 100644
+--- a/main/java/net/minecraft/Chunk.java
++++ b/main/java/net/minecraft/Chunk.java
+@@ -18,8 +18,11 @@ import net.minecraft.MathHelper;
+ import net.minecraft.NibbleArray;
+ import net.minecraft.TileEntity;
+ import net.minecraft.World;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public class Chunk {
++    private static Logger logger = LoggerFactory.getLogger("Chunk");
+     public static boolean field_694_a;
+     public byte[] blocks;
+     public boolean isChunkLoaded;
+@@ -328,7 +331,7 @@ public class Chunk {
+         int n2 = MathHelper.floor_double(entity.posX / 16.0);
+         int n3 = MathHelper.floor_double(entity.posZ / 16.0);
+         if (n2 != this.xPosition || n3 != this.zPosition) {
+-            System.out.println("Wrong location! " + entity);
++            logger.warn("Wrong location! {}", entity);
+             Thread.dumpStack();
+         }
+         if ((n = MathHelper.floor_double(entity.posY / 16.0)) < 0) {
+@@ -391,7 +394,7 @@ public class Chunk {
+         tileEntity.yCoord = n2;
+         tileEntity.zCoord = this.zPosition * 16 + n3;
+         if (this.getBlockID(n, n2, n3) == 0 || !(Block.blocksList[this.getBlockID(n, n2, n3)] instanceof BlockContainer)) {
+-            System.out.println("Attempted to place a tile entity where there was no entity tile!");
++            logger.warn("Attempted to place a tile entity where there was no entity tile!");
+             return;
+         }
+         if (this.isChunkLoaded) {
+diff --git a/main/java/net/minecraft/ChunkLoader.java b/main/java/net/minecraft/ChunkLoader.java
+index a790d9b..91e5bc9 100644
+--- a/main/java/net/minecraft/ChunkLoader.java
++++ b/main/java/net/minecraft/ChunkLoader.java
+@@ -16,9 +16,12 @@ import net.minecraft.NBTTagList;
+ import net.minecraft.NibbleArray;
+ import net.minecraft.TileEntity;
+ import net.minecraft.World;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public class ChunkLoader
+ implements IChunkLoader {
++    private static final Logger logger = LoggerFactory.getLogger("ChunkLoader");
+     private File field_945_a;
+     private boolean field_944_b;
+ 
+@@ -59,16 +62,16 @@ implements IChunkLoader {
+                 FileInputStream fileInputStream = new FileInputStream(file);
+                 NBTTagCompound nBTTagCompound = CompressedStreamTools.func_770_a(fileInputStream);
+                 if (!nBTTagCompound.hasKey("Level")) {
+-                    System.out.println("Chunk file at " + n + "," + n2 + " is missing level data, skipping");
++                    logger.warn("Chunk file at {}, {} is missing level data, skipping", n, n2);
+                     return null;
+                 }
+                 if (!nBTTagCompound.getCompoundTag("Level").hasKey("Blocks")) {
+-                    System.out.println("Chunk file at " + n + "," + n2 + " is missing block data, skipping");
++                    logger.warn("Chunk file at {}, {} is missing level data, skipping", n, n2);
+                     return null;
+                 }
+                 Chunk chunk = ChunkLoader.func_664_a(world, nBTTagCompound.getCompoundTag("Level"));
+                 if (!chunk.isAtLocation(n, n2)) {
+-                    System.out.println("Chunk file at " + n + "," + n2 + " is in the wrong location; relocating. (Expected " + n + ", " + n2 + ", got " + chunk.xPosition + ", " + chunk.zPosition + ")");
++                    logger.warn("Chunk file at {}, {} is in the wrong location; relocating. (Expected {}, {}, got {}, {})", n, n2, n, n2, chunk.xPosition, chunk.zPosition);
+                     nBTTagCompound.setInteger("xPos", n);
+                     nBTTagCompound.setInteger("zPos", n2);
+                     chunk = ChunkLoader.func_664_a(world, nBTTagCompound.getCompoundTag("Level"));
+diff --git a/main/java/net/minecraft/CraftingManager.java b/main/java/net/minecraft/CraftingManager.java
+index f380bab..8601eba 100644
+--- a/main/java/net/minecraft/CraftingManager.java
++++ b/main/java/net/minecraft/CraftingManager.java
+@@ -7,21 +7,14 @@ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.HashMap;
+ import java.util.List;
+-import net.minecraft.Block;
+-import net.minecraft.CraftingRecipe;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-import net.minecraft.RecipeSorter;
+-import net.minecraft.RecipesArmor;
+-import net.minecraft.RecipesCrafting;
+-import net.minecraft.RecipesFood;
+-import net.minecraft.RecipesIngots;
+-import net.minecraft.RecipesTools;
+-import net.minecraft.RecipesWeapons;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public class CraftingManager {
++    private static Logger logger = LoggerFactory.getLogger("CraftingManager");
+     private static final CraftingManager field_20155_a = new CraftingManager();
+-    private List field_20154_b = new ArrayList();
++    private List<CraftingRecipe> recipes = new ArrayList();
+ 
+     public static final CraftingManager func_20151_a() {
+         return field_20155_a;
+@@ -34,52 +27,52 @@ public class CraftingManager {
+         new RecipesFood().func_20177_a(this);
+         new RecipesCrafting().func_20115_a(this);
+         new RecipesArmor().func_20172_a(this);
+-        this.func_20153_a(new ItemStack(Item.paper, 3), "###", Character.valueOf('#'), Item.reed);
+-        this.func_20153_a(new ItemStack(Item.book, 1), "#", "#", "#", Character.valueOf('#'), Item.paper);
+-        this.func_20153_a(new ItemStack(Block.fence, 2), "###", "###", Character.valueOf('#'), Item.stick);
+-        this.func_20153_a(new ItemStack(Block.jukebox, 1), "###", "#X#", "###", Character.valueOf('#'), Block.planks, Character.valueOf('X'), Item.diamond);
+-        this.func_20153_a(new ItemStack(Block.bookShelf, 1), "###", "XXX", "###", Character.valueOf('#'), Block.planks, Character.valueOf('X'), Item.book);
+-        this.func_20153_a(new ItemStack(Block.blockSnow, 1), "##", "##", Character.valueOf('#'), Item.snowball);
+-        this.func_20153_a(new ItemStack(Block.blockClay, 1), "##", "##", Character.valueOf('#'), Item.clay);
+-        this.func_20153_a(new ItemStack(Block.brick, 1), "##", "##", Character.valueOf('#'), Item.brick);
+-        this.func_20153_a(new ItemStack(Block.lightStone, 1), "###", "###", "###", Character.valueOf('#'), Item.lightStoneDust);
+-        this.func_20153_a(new ItemStack(Block.cloth, 1), "###", "###", "###", Character.valueOf('#'), Item.silk);
+-        this.func_20153_a(new ItemStack(Block.tnt, 1), "X#X", "#X#", "X#X", Character.valueOf('X'), Item.gunpowder, Character.valueOf('#'), Block.sand);
+-        this.func_20153_a(new ItemStack(Block.stairSingle, 3), "###", Character.valueOf('#'), Block.cobblestone);
+-        this.func_20153_a(new ItemStack(Block.ladder, 1), "# #", "###", "# #", Character.valueOf('#'), Item.stick);
+-        this.func_20153_a(new ItemStack(Item.doorWood, 1), "##", "##", "##", Character.valueOf('#'), Block.planks);
+-        this.func_20153_a(new ItemStack(Item.doorSteel, 1), "##", "##", "##", Character.valueOf('#'), Item.ingotIron);
+-        this.func_20153_a(new ItemStack(Item.sign, 1), "###", "###", " X ", Character.valueOf('#'), Block.planks, Character.valueOf('X'), Item.stick);
+-        this.func_20153_a(new ItemStack(Block.planks, 4), "#", Character.valueOf('#'), Block.wood);
+-        this.func_20153_a(new ItemStack(Item.stick, 4), "#", "#", Character.valueOf('#'), Block.planks);
+-        this.func_20153_a(new ItemStack(Block.torchWood, 4), "X", "#", Character.valueOf('X'), Item.coal, Character.valueOf('#'), Item.stick);
+-        this.func_20153_a(new ItemStack(Item.bowlEmpty, 4), "# #", " # ", Character.valueOf('#'), Block.planks);
+-        this.func_20153_a(new ItemStack(Block.minecartTrack, 16), "X X", "X#X", "X X", Character.valueOf('X'), Item.ingotIron, Character.valueOf('#'), Item.stick);
+-        this.func_20153_a(new ItemStack(Item.minecartEmpty, 1), "# #", "###", Character.valueOf('#'), Item.ingotIron);
+-        this.func_20153_a(new ItemStack(Block.pumpkinLantern, 1), "A", "B", Character.valueOf('A'), Block.pumpkin, Character.valueOf('B'), Block.torchWood);
+-        this.func_20153_a(new ItemStack(Item.minecartCrate, 1), "A", "B", Character.valueOf('A'), Block.crate, Character.valueOf('B'), Item.minecartEmpty);
+-        this.func_20153_a(new ItemStack(Item.minecartPowered, 1), "A", "B", Character.valueOf('A'), Block.stoneOvenIdle, Character.valueOf('B'), Item.minecartEmpty);
+-        this.func_20153_a(new ItemStack(Item.boat, 1), "# #", "###", Character.valueOf('#'), Block.planks);
+-        this.func_20153_a(new ItemStack(Item.bucketEmpty, 1), "# #", " # ", Character.valueOf('#'), Item.ingotIron);
+-        this.func_20153_a(new ItemStack(Item.flintAndSteel, 1), "A ", " B", Character.valueOf('A'), Item.ingotIron, Character.valueOf('B'), Item.flint);
+-        this.func_20153_a(new ItemStack(Item.bread, 1), "###", Character.valueOf('#'), Item.wheat);
+-        this.func_20153_a(new ItemStack(Block.stairCompactPlanks, 4), "#  ", "## ", "###", Character.valueOf('#'), Block.planks);
+-        this.func_20153_a(new ItemStack(Item.fishingRod, 1), "  #", " #X", "# X", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Item.silk);
+-        this.func_20153_a(new ItemStack(Block.stairCompactCobblestone, 4), "#  ", "## ", "###", Character.valueOf('#'), Block.cobblestone);
+-        this.func_20153_a(new ItemStack(Item.painting, 1), "###", "#X#", "###", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Block.cloth);
+-        this.func_20153_a(new ItemStack(Item.appleGold, 1), "###", "#X#", "###", Character.valueOf('#'), Block.blockGold, Character.valueOf('X'), Item.appleRed);
+-        this.func_20153_a(new ItemStack(Block.lever, 1), "X", "#", Character.valueOf('#'), Block.cobblestone, Character.valueOf('X'), Item.stick);
+-        this.func_20153_a(new ItemStack(Block.torchRedstoneActive, 1), "X", "#", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Item.redstone);
+-        this.func_20153_a(new ItemStack(Item.pocketSundial, 1), " # ", "#X#", " # ", Character.valueOf('#'), Item.ingotGold, Character.valueOf('X'), Item.redstone);
+-        this.func_20153_a(new ItemStack(Item.compass, 1), " # ", "#X#", " # ", Character.valueOf('#'), Item.ingotIron, Character.valueOf('X'), Item.redstone);
+-        this.func_20153_a(new ItemStack(Block.button, 1), "#", "#", Character.valueOf('#'), Block.stone);
+-        this.func_20153_a(new ItemStack(Block.pressurePlateStone, 1), "###", Character.valueOf('#'), Block.stone);
+-        this.func_20153_a(new ItemStack(Block.pressurePlatePlanks, 1), "###", Character.valueOf('#'), Block.planks);
+-        Collections.sort(this.field_20154_b, new RecipeSorter(this));
+-        System.out.println(this.field_20154_b.size() + " recipes");
++        this.add(new ItemStack(Item.paper, 3), "###", Character.valueOf('#'), Item.reed);
++        this.add(new ItemStack(Item.book, 1), "#", "#", "#", Character.valueOf('#'), Item.paper);
++        this.add(new ItemStack(Block.fence, 2), "###", "###", Character.valueOf('#'), Item.stick);
++        this.add(new ItemStack(Block.jukebox, 1), "###", "#X#", "###", Character.valueOf('#'), Block.planks, Character.valueOf('X'), Item.diamond);
++        this.add(new ItemStack(Block.bookShelf, 1), "###", "XXX", "###", Character.valueOf('#'), Block.planks, Character.valueOf('X'), Item.book);
++        this.add(new ItemStack(Block.blockSnow, 1), "##", "##", Character.valueOf('#'), Item.snowball);
++        this.add(new ItemStack(Block.blockClay, 1), "##", "##", Character.valueOf('#'), Item.clay);
++        this.add(new ItemStack(Block.brick, 1), "##", "##", Character.valueOf('#'), Item.brick);
++        this.add(new ItemStack(Block.lightStone, 1), "###", "###", "###", Character.valueOf('#'), Item.lightStoneDust);
++        this.add(new ItemStack(Block.cloth, 1), "###", "###", "###", Character.valueOf('#'), Item.silk);
++        this.add(new ItemStack(Block.tnt, 1), "X#X", "#X#", "X#X", Character.valueOf('X'), Item.gunpowder, Character.valueOf('#'), Block.sand);
++        this.add(new ItemStack(Block.stairSingle, 3), "###", Character.valueOf('#'), Block.cobblestone);
++        this.add(new ItemStack(Block.ladder, 1), "# #", "###", "# #", Character.valueOf('#'), Item.stick);
++        this.add(new ItemStack(Item.doorWood, 1), "##", "##", "##", Character.valueOf('#'), Block.planks);
++        this.add(new ItemStack(Item.doorSteel, 1), "##", "##", "##", Character.valueOf('#'), Item.ingotIron);
++        this.add(new ItemStack(Item.sign, 1), "###", "###", " X ", Character.valueOf('#'), Block.planks, Character.valueOf('X'), Item.stick);
++        this.add(new ItemStack(Block.planks, 4), "#", Character.valueOf('#'), Block.wood);
++        this.add(new ItemStack(Item.stick, 4), "#", "#", Character.valueOf('#'), Block.planks);
++        this.add(new ItemStack(Block.torchWood, 4), "X", "#", Character.valueOf('X'), Item.coal, Character.valueOf('#'), Item.stick);
++        this.add(new ItemStack(Item.bowlEmpty, 4), "# #", " # ", Character.valueOf('#'), Block.planks);
++        this.add(new ItemStack(Block.minecartTrack, 16), "X X", "X#X", "X X", Character.valueOf('X'), Item.ingotIron, Character.valueOf('#'), Item.stick);
++        this.add(new ItemStack(Item.minecartEmpty, 1), "# #", "###", Character.valueOf('#'), Item.ingotIron);
++        this.add(new ItemStack(Block.pumpkinLantern, 1), "A", "B", Character.valueOf('A'), Block.pumpkin, Character.valueOf('B'), Block.torchWood);
++        this.add(new ItemStack(Item.minecartCrate, 1), "A", "B", Character.valueOf('A'), Block.crate, Character.valueOf('B'), Item.minecartEmpty);
++        this.add(new ItemStack(Item.minecartPowered, 1), "A", "B", Character.valueOf('A'), Block.stoneOvenIdle, Character.valueOf('B'), Item.minecartEmpty);
++        this.add(new ItemStack(Item.boat, 1), "# #", "###", Character.valueOf('#'), Block.planks);
++        this.add(new ItemStack(Item.bucketEmpty, 1), "# #", " # ", Character.valueOf('#'), Item.ingotIron);
++        this.add(new ItemStack(Item.flintAndSteel, 1), "A ", " B", Character.valueOf('A'), Item.ingotIron, Character.valueOf('B'), Item.flint);
++        this.add(new ItemStack(Item.bread, 1), "###", Character.valueOf('#'), Item.wheat);
++        this.add(new ItemStack(Block.stairCompactPlanks, 4), "#  ", "## ", "###", Character.valueOf('#'), Block.planks);
++        this.add(new ItemStack(Item.fishingRod, 1), "  #", " #X", "# X", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Item.silk);
++        this.add(new ItemStack(Block.stairCompactCobblestone, 4), "#  ", "## ", "###", Character.valueOf('#'), Block.cobblestone);
++        this.add(new ItemStack(Item.painting, 1), "###", "#X#", "###", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Block.cloth);
++        this.add(new ItemStack(Item.appleGold, 1), "###", "#X#", "###", Character.valueOf('#'), Block.blockGold, Character.valueOf('X'), Item.appleRed);
++        this.add(new ItemStack(Block.lever, 1), "X", "#", Character.valueOf('#'), Block.cobblestone, Character.valueOf('X'), Item.stick);
++        this.add(new ItemStack(Block.torchRedstoneActive, 1), "X", "#", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Item.redstone);
++        this.add(new ItemStack(Item.pocketSundial, 1), " # ", "#X#", " # ", Character.valueOf('#'), Item.ingotGold, Character.valueOf('X'), Item.redstone);
++        this.add(new ItemStack(Item.compass, 1), " # ", "#X#", " # ", Character.valueOf('#'), Item.ingotIron, Character.valueOf('X'), Item.redstone);
++        this.add(new ItemStack(Block.button, 1), "#", "#", Character.valueOf('#'), Block.stone);
++        this.add(new ItemStack(Block.pressurePlateStone, 1), "###", Character.valueOf('#'), Block.stone);
++        this.add(new ItemStack(Block.pressurePlatePlanks, 1), "###", Character.valueOf('#'), Block.planks);
++        Collections.sort(this.recipes, new RecipeSorter(this));
++        logger.info("Loaded {} recipes", this.recipes.size());
+     }
+ 
+-    void func_20153_a(ItemStack itemStack, Object ... objectArray) {
++    void add(ItemStack itemStack, Object ... objectArray) {
+         Object object;
+         String string = "";
+         int n = 0;
+@@ -119,12 +112,12 @@ public class CraftingManager {
+             char c = string.charAt(i);
+             nArray[i] = map.containsKey(c) ? (Integer)map.get(c) : -1;
+         }
+-        this.field_20154_b.add(new CraftingRecipe(n2, n3, nArray, itemStack));
++        this.recipes.add(new CraftingRecipe(n2, n3, nArray, itemStack));
+     }
+ 
+     public ItemStack func_20152_a(int[] nArray) {
+-        for (int i = 0; i < this.field_20154_b.size(); ++i) {
+-            CraftingRecipe craftingRecipe = (CraftingRecipe)this.field_20154_b.get(i);
++        for (int i = 0; i < this.recipes.size(); ++i) {
++            CraftingRecipe craftingRecipe = (CraftingRecipe)this.recipes.get(i);
+             if (!craftingRecipe.func_20164_a(nArray)) continue;
+             return craftingRecipe.func_20163_b(nArray);
+         }
+diff --git a/main/java/net/minecraft/EntityList.java b/main/java/net/minecraft/EntityList.java
+index f14804c..c20d8d5 100644
+--- a/main/java/net/minecraft/EntityList.java
++++ b/main/java/net/minecraft/EntityList.java
+@@ -30,8 +30,11 @@ import net.minecraft.EntityZombie;
+ import net.minecraft.EntityZombieSimple;
+ import net.minecraft.NBTTagCompound;
+ import net.minecraft.World;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public class EntityList {
++    private static Logger logger = LoggerFactory.getLogger("EntityList");
+     private static Map field_849_a = new HashMap();
+     private static Map field_848_b = new HashMap();
+     private static Map field_851_c = new HashMap();
+@@ -72,7 +75,7 @@ public class EntityList {
+         if (entity != null) {
+             entity.readFromNBT(nBTTagCompound);
+         } else {
+-            System.out.println("Skipping Entity with id " + nBTTagCompound.getString("id"));
++            logger.warn("Skipping Entity with id {}", nBTTagCompound.getString("id"));
+         }
+         return entity;
+     }
+diff --git a/main/java/net/minecraft/GuiLogOutputHandler.java b/main/java/net/minecraft/GuiLogOutputHandler.java
+index a341bdf..2974f7f 100644
+--- a/main/java/net/minecraft/GuiLogOutputHandler.java
++++ b/main/java/net/minecraft/GuiLogOutputHandler.java
+@@ -7,18 +7,17 @@ import java.util.logging.Formatter;
+ import java.util.logging.Handler;
+ import java.util.logging.LogRecord;
+ import javax.swing.JTextArea;
+-import net.minecraft.GuiLogFormatter;
+ 
+ public class GuiLogOutputHandler
+ extends Handler {
+     private int[] field_998_b = new int[1024];
+     private int field_1001_c = 0;
+-    Formatter field_999_a = new GuiLogFormatter(this);
+-    private JTextArea field_1000_d;
++    Formatter formatter = new GuiLogFormatter(this);
++    private JTextArea textArea;
+ 
+     public GuiLogOutputHandler(JTextArea jTextArea) {
+-        this.setFormatter(this.field_999_a);
+-        this.field_1000_d = jTextArea;
++        this.setFormatter(this.formatter);
++        this.textArea = jTextArea;
+     }
+ 
+     public void close() {
+@@ -28,12 +27,12 @@ extends Handler {
+     }
+ 
+     public void publish(LogRecord logRecord) {
+-        int n = this.field_1000_d.getDocument().getLength();
+-        this.field_1000_d.append(this.field_999_a.format(logRecord));
+-        this.field_1000_d.setCaretPosition(this.field_1000_d.getDocument().getLength());
+-        int n2 = this.field_1000_d.getDocument().getLength() - n;
++        int n = this.textArea.getDocument().getLength();
++        this.textArea.append(this.formatter.format(logRecord));
++        this.textArea.setCaretPosition(this.textArea.getDocument().getLength());
++        int n2 = this.textArea.getDocument().getLength() - n;
+         if (this.field_998_b[this.field_1001_c] != 0) {
+-            this.field_1000_d.replaceRange("", 0, this.field_998_b[this.field_1001_c]);
++            this.textArea.replaceRange("", 0, this.field_998_b[this.field_1001_c]);
+         }
+         this.field_998_b[this.field_1001_c] = n2;
+         this.field_1001_c = (this.field_1001_c + 1) % 1024;
 diff --git a/main/java/net/minecraft/NetLoginHandler.java b/main/java/net/minecraft/NetLoginHandler.java
-index acfab40..4ecfa40 100644
+index acfab40..6cdbdd2 100644
 --- a/main/java/net/minecraft/NetLoginHandler.java
 +++ b/main/java/net/minecraft/NetLoginHandler.java
-@@ -81,13 +81,14 @@ public class NetLoginHandler
+@@ -4,14 +4,16 @@
+ package net.minecraft;
+ 
+ import net.minecraft.server.MinecraftServer;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ import java.net.Socket;
+ import java.util.Random;
+-import java.util.logging.Logger;
+ 
+ public class NetLoginHandler
+         extends NetHandler {
+-    public static Logger logger = Logger.getLogger("Minecraft");
++    public static Logger logger = LoggerFactory.getLogger("LoginHandler");
++    //public static Logger logger = Logger.getLogger("Minecraft");
+     private static final Random rand = new Random();
+     public NetworkManager netManager;
+     public boolean finishedProcessing = false;
+@@ -81,13 +83,14 @@ public class NetLoginHandler
          if (entityPlayerMP != null) {
              logger.info(this.getUserAndIPString() + " logged in with entity id " + entityPlayerMP.field_331_c);
              NetServerHandler netServerHandler = new NetServerHandler(this.mcServer, this.netManager, entityPlayerMP);
+-            netServerHandler.sendPacket(new Packet1Login("", "", entityPlayerMP.field_331_c, this.mcServer.worldMngr.randomSeed, (byte)this.mcServer.worldMngr.worldProvider.worldType));
+-            netServerHandler.sendPacket(new Packet6SpawnPosition(this.mcServer.worldMngr.spawnX, this.mcServer.worldMngr.spawnY, this.mcServer.worldMngr.spawnZ));
+-            // Start Dart - Send player join message as well
+-            Packet3Chat joinMsg = new Packet3Chat("\u00a7e" + entityPlayerMP.username + " joined the game.");
+-            this.mcServer.configManager.sendPacketToAllPlayers(joinMsg);
+-            netServerHandler.sendPacket(joinMsg);
 +            // Dart - defer join logic to AbstractMinecraftServer
 +            if (!mcServer.handleJoin(entityPlayerMP)) {
 +                this.finishedProcessing = true;
 +                return;
 +            }
-+            // End Dart
-             netServerHandler.sendPacket(new Packet1Login("", "", entityPlayerMP.field_331_c, this.mcServer.worldMngr.randomSeed, (byte)this.mcServer.worldMngr.worldProvider.worldType));
-             netServerHandler.sendPacket(new Packet6SpawnPosition(this.mcServer.worldMngr.spawnX, this.mcServer.worldMngr.spawnY, this.mcServer.worldMngr.spawnZ));
--            // Start Dart - Send player join message as well
--            Packet3Chat joinMsg = new Packet3Chat("\u00a7e" + entityPlayerMP.username + " joined the game.");
--            this.mcServer.configManager.sendPacketToAllPlayers(joinMsg);
--            netServerHandler.sendPacket(joinMsg);
--            // End Dart
+             // End Dart
++            netServerHandler.sendPacket(new Packet1Login("", "", entityPlayerMP.field_331_c, this.mcServer.worldMngr.randomSeed, (byte) this.mcServer.worldMngr.worldProvider.worldType));
++            netServerHandler.sendPacket(new Packet6SpawnPosition(this.mcServer.worldMngr.spawnX, this.mcServer.worldMngr.spawnY, this.mcServer.worldMngr.spawnZ));
              this.mcServer.configManager.playerLoggedIn(entityPlayerMP);
              netServerHandler.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
              this.mcServer.field_6036_c.func_4108_a(netServerHandler);
 diff --git a/main/java/net/minecraft/NetServerHandler.java b/main/java/net/minecraft/NetServerHandler.java
-index 3d9fe4d..b19964f 100644
+index 3d9fe4d..c249a27 100644
 --- a/main/java/net/minecraft/NetServerHandler.java
 +++ b/main/java/net/minecraft/NetServerHandler.java
-@@ -311,9 +311,14 @@ implements ICommandListener {
+@@ -3,27 +3,29 @@
+  */
+ package net.minecraft;
+ 
++import net.minecraft.server.MinecraftServer;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
+ import java.util.ArrayList;
+ import java.util.HashMap;
+ import java.util.Map;
+-import java.util.logging.Logger;
+-
+-import net.minecraft.server.MinecraftServer;
+ 
+ public class NetServerHandler
+-extends NetHandler
+-implements ICommandListener {
+-    public static Logger logger = Logger.getLogger("Minecraft");
++        extends NetHandler
++        implements ICommandListener {
++    public static Logger logger = LoggerFactory.getLogger("PlayHandler");
++    //public static Logger logger = Logger.getLogger("Minecraft");
+     public NetworkManager netManager;
+     public boolean field_18_c = false;
+-    private MinecraftServer mcServer;
++    private final MinecraftServer mcServer;
+     private EntityPlayerMP playerEntity;
+     private int field_15_f = 0;
+     private double field_9009_g;
+     private double field_9008_h;
+     private double field_9007_i;
+     private boolean field_9006_j = true;
+-    private Map field_10_k = new HashMap();
++    private final Map field_10_k = new HashMap();
+ 
+     public NetServerHandler(MinecraftServer minecraftServer, NetworkManager networkManager, EntityPlayerMP entityPlayerMP) {
+         this.mcServer = minecraftServer;
+@@ -114,7 +116,7 @@ implements ICommandListener {
+                 d2 = packet10Flying.stance - packet10Flying.yPosition;
+                 if (d2 > 1.65 || d2 < 0.1) {
+                     this.disconnect("Illegal stance");
+-                    logger.warning(this.playerEntity.username + " had an illegal stance: " + d2);
++                    logger.warn("{} had an illegal stance: {}", this.playerEntity.username, d2);
+                 }
+                 this.playerEntity.field_418_ai = packet10Flying.stance;
+             }
+@@ -141,9 +143,9 @@ implements ICommandListener {
+             boolean bl3 = false;
+             if (d13 > 0.0625) {
+                 bl3 = true;
+-                logger.warning(this.playerEntity.username + " moved wrongly!");
+-                System.out.println("Got position " + d8 + ", " + d9 + ", " + d10);
+-                System.out.println("Expected " + this.playerEntity.posX + ", " + this.playerEntity.posY + ", " + this.playerEntity.posZ);
++                logger.warn("{} moved wrongly!", this.playerEntity.username);
++                logger.warn("Got position {}, {}, {}", d8, d9, d10);
++                logger.warn("Expected {}, {}, {}", this.playerEntity.posX, this.playerEntity.posY, this.playerEntity.posZ);
+             }
+             this.playerEntity.setPositionAndRotation(d8, d9, d10, f, f3);
+             boolean bl4 = bl = this.mcServer.worldMngr.getCollidingBoundingBoxes(this.playerEntity, this.playerEntity.boundingBox.copy().func_694_e(f4, f4, f4)).size() == 0;
+@@ -163,7 +165,7 @@ implements ICommandListener {
+         this.field_9008_h = d2;
+         this.field_9007_i = d3;
+         this.playerEntity.setPositionAndRotation(d, d2, d3, f, f2);
+-        this.playerEntity.netServerHandler.sendPacket(new Packet13PlayerLookMove(d, d2 + (double)1.62f, d2, d3, f, f2, false));
++        this.playerEntity.netServerHandler.sendPacket(new Packet13PlayerLookMove(d, d2 + (double) 1.62f, d2, d3, f, f2, false));
+     }
+ 
+     public void handleBlockDig(Packet14BlockDig packet14BlockDig) {
+@@ -177,10 +179,7 @@ implements ICommandListener {
+             return;
+         }
+         boolean bl = this.mcServer.worldMngr.field_819_z = this.mcServer.configManager.isOp(this.playerEntity.username);
+-        boolean bl2 = false;
+-        if (packet14BlockDig.status == 0) {
+-            bl2 = true;
+-        }
++        boolean bl2 = packet14BlockDig.status == 0;
+         if (packet14BlockDig.status == 1) {
+             bl2 = true;
+         }
+@@ -188,9 +187,9 @@ implements ICommandListener {
+         int n3 = packet14BlockDig.yPosition;
+         int n4 = packet14BlockDig.zPosition;
+         if (bl2) {
+-            double d5 = this.playerEntity.posX - ((double)n2 + 0.5);
+-            double d6 = this.playerEntity.posY - ((double)n3 + 0.5);
+-            double d7 = this.playerEntity.posZ - ((double)n4 + 0.5);
++            double d5 = this.playerEntity.posX - ((double) n2 + 0.5);
++            double d6 = this.playerEntity.posY - ((double) n3 + 0.5);
++            double d7 = this.playerEntity.posZ - ((double) n4 + 0.5);
+             double d8 = d5 * d5 + d6 * d6 + d7 * d7;
+             if (d8 > 36.0) {
+                 return;
+@@ -200,8 +199,8 @@ implements ICommandListener {
+             this.playerEntity.posY = d9;
+         }
+         int n5 = packet14BlockDig.face;
+-        int n6 = (int)MathHelper.abs(n2 - this.mcServer.worldMngr.spawnX);
+-        if (n6 > (n = (int)MathHelper.abs(n4 - this.mcServer.worldMngr.spawnZ))) {
++        int n6 = (int) MathHelper.abs(n2 - this.mcServer.worldMngr.spawnX);
++        if (n6 > (n = (int) MathHelper.abs(n4 - this.mcServer.worldMngr.spawnZ))) {
+             n = n6;
+         }
+         if (packet14BlockDig.status == 0) {
+@@ -214,7 +213,7 @@ implements ICommandListener {
+             if (n > 16 || bl) {
+                 this.playerEntity.field_425_ad.func_326_a(n2, n3, n4, n5);
+             }
+-        } else if (packet14BlockDig.status == 3 && (d4 = (d3 = this.playerEntity.posX - ((double)n2 + 0.5)) * d3 + (d2 = this.playerEntity.posY - ((double)n3 + 0.5)) * d2 + (d = this.playerEntity.posZ - ((double)n4 + 0.5)) * d) < 256.0) {
++        } else if (packet14BlockDig.status == 3 && (d4 = (d3 = this.playerEntity.posX - ((double) n2 + 0.5)) * d3 + (d2 = this.playerEntity.posY - ((double) n3 + 0.5)) * d2 + (d = this.playerEntity.posZ - ((double) n4 + 0.5)) * d) < 256.0) {
+             this.playerEntity.netServerHandler.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
+         }
+         this.mcServer.worldMngr.field_819_z = false;
+@@ -234,8 +233,8 @@ implements ICommandListener {
+             int n3 = packet15Place.xPosition;
+             int n4 = packet15Place.yPosition;
+             int n5 = packet15Place.zPosition;
+-            int n6 = (int)MathHelper.abs(n2 - this.mcServer.worldMngr.spawnX);
+-            if (n6 > (n = (int)MathHelper.abs(n4 - this.mcServer.worldMngr.spawnZ))) {
++            int n6 = (int) MathHelper.abs(n2 - this.mcServer.worldMngr.spawnX);
++            if (n6 > (n = (int) MathHelper.abs(n4 - this.mcServer.worldMngr.spawnZ))) {
+                 n = n6;
+             }
+             if (n > 16 || bl) {
+@@ -284,7 +283,7 @@ implements ICommandListener {
+     }
+ 
+     public void func_6001_a(Packet packet) {
+-        logger.warning(this.getClass() + " wasn't prepared to deal with a " + packet.getClass());
++        logger.warn("{} wasn't prepared to deal with a {}", this.getClass(), packet.getClass());
+         this.disconnect("Protocol error, unexpected packet");
+     }
+ 
+@@ -311,9 +310,14 @@ implements ICommandListener {
          if (string.startsWith("/")) {
              this.func_4010_d(string);
          } else {
@@ -106,15 +580,487 @@ index 3d9fe4d..b19964f 100644
          }
      }
  
+@@ -356,7 +360,7 @@ implements ICommandListener {
+     }
+ 
+     public void handleKickDisconnect(Packet255KickDisconnect packet255KickDisconnect) {
+-        this.netManager.networkShutdown("disconnect.quitting", new Object[0]);
++        this.netManager.networkShutdown("disconnect.quitting");
+     }
+ 
+     public int func_38_b() {
+@@ -408,7 +412,7 @@ implements ICommandListener {
+                 this.playerEntity.field_20052_ap.func_20129_a(this.playerEntity, false);
+                 ArrayList<ItemStack> arrayList = new ArrayList<ItemStack>();
+                 for (int i = 0; i < this.playerEntity.field_20052_ap.field_20135_e.size(); ++i) {
+-                    arrayList.add(((Slot)this.playerEntity.field_20052_ap.field_20135_e.get(i)).func_20092_c());
++                    arrayList.add(((Slot) this.playerEntity.field_20052_ap.field_20135_e.get(i)).func_20092_c());
+                 }
+                 this.playerEntity.func_20054_a(this.playerEntity.field_20052_ap, arrayList);
+             }
+@@ -416,7 +420,7 @@ implements ICommandListener {
+     }
+ 
+     public void func_20008_a(Packet106 packet106) {
+-        Short s = (Short)this.field_10_k.get(this.playerEntity.field_20052_ap.field_20134_f);
++        Short s = (Short) this.field_10_k.get(this.playerEntity.field_20052_ap.field_20134_f);
+         if (s != null && packet106.field_20033_b == s && this.playerEntity.field_20052_ap.field_20134_f == packet106.field_20034_a && !this.playerEntity.field_20052_ap.func_20124_c(this.playerEntity)) {
+             this.playerEntity.field_20052_ap.func_20129_a(this.playerEntity, true);
+         }
+@@ -434,7 +438,8 @@ implements ICommandListener {
+                     n2 = 0;
+                 } else {
+                     for (n = 0; n < packet130.field_20021_d[n3].length(); ++n) {
+-                        if (FontAllowedCharacters.field_20162_a.indexOf(packet130.field_20021_d[n3].charAt(n)) >= 0) continue;
++                        if (FontAllowedCharacters.field_20162_a.indexOf(packet130.field_20021_d[n3].charAt(n)) >= 0)
++                            continue;
+                         n2 = 0;
+                     }
+                 }
+@@ -445,7 +450,7 @@ implements ICommandListener {
+                 n3 = packet130.field_20020_a;
+                 n2 = packet130.field_20019_b;
+                 n = packet130.field_20022_c;
+-                TileEntitySign tileEntitySign = (TileEntitySign)tileEntity;
++                TileEntitySign tileEntitySign = (TileEntitySign) tileEntity;
+                 for (int i = 0; i < 4; ++i) {
+                     tileEntitySign.signText[i] = packet130.field_20021_d[i];
+                 }
+diff --git a/main/java/net/minecraft/NetworkAcceptThread.java b/main/java/net/minecraft/NetworkAcceptThread.java
+index 770e31c..6aa0755 100644
+--- a/main/java/net/minecraft/NetworkAcceptThread.java
++++ b/main/java/net/minecraft/NetworkAcceptThread.java
+@@ -23,7 +23,7 @@ extends Thread {
+     public void run() {
+         while (this.field_985_b.field_973_b) {
+             try {
+-                Socket socket = NetworkListenThread.func_713_a(this.field_985_b).accept();
++                Socket socket = field_985_b.func_713_a(this.field_985_b).accept();
+                 if (socket == null) continue;
+                 NetLoginHandler netLoginHandler = new NetLoginHandler(this.mcServer, socket, "Connection #" + NetworkListenThread.func_712_b(this.field_985_b));
+                 NetworkListenThread.func_716_a(this.field_985_b, netLoginHandler);
+diff --git a/main/java/net/minecraft/NetworkListenThread.java b/main/java/net/minecraft/NetworkListenThread.java
+index b2839a4..b964778 100644
+--- a/main/java/net/minecraft/NetworkListenThread.java
++++ b/main/java/net/minecraft/NetworkListenThread.java
+@@ -3,29 +3,31 @@
+  */
+ package net.minecraft;
+ 
++import net.minecraft.server.MinecraftServer;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
+ import java.io.IOException;
+ import java.net.InetAddress;
+ import java.net.ServerSocket;
+ import java.util.ArrayList;
+ import java.util.logging.Level;
+-import java.util.logging.Logger;
+-
+-import net.minecraft.server.MinecraftServer;
+ 
+ public class NetworkListenThread {
+-    public static Logger logger = Logger.getLogger("Minecraft");
++    public static Logger logger = LoggerFactory.getLogger("NetworkListener");
++    //public static Logger logger = Logger.getLogger("Minecraft");
+     private ServerSocket serverSocket;
+-    private Thread networkAcceptThread;
++    private final Thread networkAcceptThread;
+     public volatile boolean field_973_b = false;
+     private int field_977_f = 0;
+-    private ArrayList field_976_g = new ArrayList();
+-    private ArrayList field_975_h = new ArrayList();
++    private final ArrayList field_976_g = new ArrayList();
++    private final ArrayList field_975_h = new ArrayList();
+     public MinecraftServer mcServer;
+ 
+     public NetworkListenThread(MinecraftServer minecraftServer, InetAddress inetAddress, int n) throws IOException {
+         this.mcServer = minecraftServer;
+-        this.serverSocket = new ServerSocket(n, 0, inetAddress);
+-        this.serverSocket.setPerformancePreferences(0, 2, 1);
++        serverSocket = new ServerSocket(n, 0, inetAddress);
++        serverSocket.setPerformancePreferences(0, 2, 1);
+         this.field_973_b = true;
+         this.networkAcceptThread = new NetworkAcceptThread(this, "Listen thread", minecraftServer);
+         this.networkAcceptThread.start();
+@@ -46,33 +48,31 @@ public class NetworkListenThread {
+         NetHandler netHandler;
+         int n;
+         for (n = 0; n < this.field_976_g.size(); ++n) {
+-            netHandler = (NetLoginHandler)this.field_976_g.get(n);
++            netHandler = (NetLoginHandler) this.field_976_g.get(n);
+             try {
+-                ((NetLoginHandler)netHandler).tryLogin();
+-            }
+-            catch (Exception exception) {
+-                ((NetLoginHandler)netHandler).kickUser("Internal server error");
+-                logger.log(Level.WARNING, "Failed to handle packet: " + exception, exception);
++                ((NetLoginHandler) netHandler).tryLogin();
++            } catch (Exception exception) {
++                ((NetLoginHandler) netHandler).kickUser("Internal server error");
++                logger.warn("Failed to handle packet: ", exception);
+             }
+-            if (!((NetLoginHandler)netHandler).finishedProcessing) continue;
++            if (!((NetLoginHandler) netHandler).finishedProcessing) continue;
+             this.field_976_g.remove(n--);
+         }
+         for (n = 0; n < this.field_975_h.size(); ++n) {
+-            netHandler = (NetServerHandler)this.field_975_h.get(n);
++            netHandler = (NetServerHandler) this.field_975_h.get(n);
+             try {
+-                ((NetServerHandler)netHandler).func_42_a();
+-            }
+-            catch (Exception exception) {
+-                logger.log(Level.WARNING, "Failed to handle packet: " + exception, exception);
+-                ((NetServerHandler)netHandler).disconnect("Internal server error");
++                ((NetServerHandler) netHandler).func_42_a();
++            } catch (Exception exception) {
++                logger.warn("Failed to handle packet: ", exception);
++                ((NetServerHandler) netHandler).disconnect("Internal server error");
+             }
+-            if (!((NetServerHandler)netHandler).field_18_c) continue;
++            if (!((NetServerHandler) netHandler).field_18_c) continue;
+             this.field_975_h.remove(n--);
+         }
+     }
+ 
+-    static /* synthetic */ ServerSocket func_713_a(NetworkListenThread networkListenThread) {
+-        return networkListenThread.serverSocket;
++    /* synthetic */ ServerSocket func_713_a(NetworkListenThread networkListenThread) {
++        return serverSocket;
+     }
+ 
+     static /* synthetic */ int func_712_b(NetworkListenThread networkListenThread) {
+diff --git a/main/java/net/minecraft/Packet.java b/main/java/net/minecraft/Packet.java
+index cf97b85..e6eff59 100644
+--- a/main/java/net/minecraft/Packet.java
++++ b/main/java/net/minecraft/Packet.java
+@@ -57,8 +57,11 @@ import net.minecraft.Packet6SpawnPosition;
+ import net.minecraft.Packet7;
+ import net.minecraft.Packet8;
+ import net.minecraft.Packet9;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public abstract class Packet {
++    private static Logger logger = LoggerFactory.getLogger("Packet");
+     private static Map packetIdToClassMap = new HashMap();
+     private static Map packetClassToIdMap = new HashMap();
+     public final long field_20009_j = System.currentTimeMillis();
+@@ -85,7 +88,7 @@ public abstract class Packet {
+         }
+         catch (Exception exception) {
+             exception.printStackTrace();
+-            System.out.println("Skipping packet with id " + n);
++            logger.warn("Skipping packet with id {}", n);
+             return null;
+         }
+     }
+diff --git a/main/java/net/minecraft/PlayerInstance.java b/main/java/net/minecraft/PlayerInstance.java
+index dda579f..28c3fd6 100644
+--- a/main/java/net/minecraft/PlayerInstance.java
++++ b/main/java/net/minecraft/PlayerInstance.java
+@@ -135,7 +135,7 @@ class PlayerInstance {
+                 int n9 = this.field_1067_g & 0xFF;
+                 int n10 = this.field_1070_d * 16 + (this.field_1067_g >> 8 & 0xF);
+                 if (!Block.isBlockContainer[PlayerManager.getMinecraftServer((PlayerManager)this.field_1073_a).worldMngr.getBlockId(n, n9, n10)]) continue;
+-                System.out.println("Sending!");
++                // System.out.println("Sending!");
+                 this.func_20178_a(PlayerManager.getMinecraftServer((PlayerManager)this.field_1073_a).worldMngr.getBlockTileEntity(n, n9, n10));
+             }
+         }
+diff --git a/main/java/net/minecraft/PlayerNBTManager.java b/main/java/net/minecraft/PlayerNBTManager.java
+index 079c8ec..4f2cfcc 100644
+--- a/main/java/net/minecraft/PlayerNBTManager.java
++++ b/main/java/net/minecraft/PlayerNBTManager.java
+@@ -3,17 +3,17 @@
+  */
+ package net.minecraft;
+ 
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
+ import java.io.File;
+ import java.io.FileInputStream;
+ import java.io.FileOutputStream;
+-import java.util.logging.Logger;
+-import net.minecraft.CompressedStreamTools;
+-import net.minecraft.EntityPlayerMP;
+-import net.minecraft.NBTTagCompound;
+ 
+ public class PlayerNBTManager {
+-    public static Logger logger = Logger.getLogger("Minecraft");
+-    private File worldFile;
++    public static Logger logger = LoggerFactory.getLogger("PlayerNBTManager");
++    //public static Logger logger = Logger.getLogger("Minecraft");
++    private final File worldFile;
+ 
+     public PlayerNBTManager(File file) {
+         this.worldFile = file;
+@@ -31,9 +31,8 @@ public class PlayerNBTManager {
+                 file2.delete();
+             }
+             file.renameTo(file2);
+-        }
+-        catch (Exception exception) {
+-            logger.warning("Failed to save player data for " + entityPlayerMP.username);
++        } catch (Exception exception) {
++            logger.warn("Failed to save player data for {}", entityPlayerMP.username);
+         }
+     }
+ 
+@@ -44,9 +43,8 @@ public class PlayerNBTManager {
+             if (file.exists() && (nBTTagCompound = CompressedStreamTools.func_770_a(new FileInputStream(file))) != null) {
+                 entityPlayerMP.readFromNBT(nBTTagCompound);
+             }
+-        }
+-        catch (Exception exception) {
+-            logger.warning("Failed to load player data for " + entityPlayerMP.username);
++        } catch (Exception exception) {
++            logger.warn("Failed to load player data for {}", entityPlayerMP.username);
+         }
+     }
+ }
+diff --git a/main/java/net/minecraft/PropertyManager.java b/main/java/net/minecraft/PropertyManager.java
+index 8d25477..fbf792e 100644
+--- a/main/java/net/minecraft/PropertyManager.java
++++ b/main/java/net/minecraft/PropertyManager.java
+@@ -3,15 +3,18 @@
+  */
+ package net.minecraft;
+ 
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
+ import java.io.File;
+ import java.io.FileInputStream;
+ import java.io.FileOutputStream;
+ import java.util.Properties;
+ import java.util.logging.Level;
+-import java.util.logging.Logger;
+ 
+ public class PropertyManager {
+-    public static Logger logger = Logger.getLogger("Minecraft");
++    public static Logger logger = LoggerFactory.getLogger("PropertyManager");
++    //public static Logger logger = Logger.getLogger("Minecraft");
+     private Properties serverProperties = new Properties();
+     private File serverPropertiesFile;
+ 
+@@ -22,17 +25,17 @@ public class PropertyManager {
+                 this.serverProperties.load(new FileInputStream(file));
+             }
+             catch (Exception exception) {
+-                logger.log(Level.WARNING, "Failed to load " + file, exception);
++                logger.warn("Failed to load {}", file, exception);
+                 this.generateNewProperties();
+             }
+         } else {
+-            logger.log(Level.WARNING, file + " does not exist");
++            logger.warn("{} does not exist", file);
+             this.generateNewProperties();
+         }
+     }
+ 
+     public void generateNewProperties() {
+-        logger.log(Level.INFO, "Generating new properties file");
++        logger.info("Generating new properties file");
+         this.saveProperties();
+     }
+ 
+@@ -41,7 +44,7 @@ public class PropertyManager {
+             this.serverProperties.store(new FileOutputStream(this.serverPropertiesFile), "Minecraft server properties");
+         }
+         catch (Exception exception) {
+-            logger.log(Level.WARNING, "Failed to save " + this.serverPropertiesFile, exception);
++            logger.warn("Failed to save {}", this.serverPropertiesFile, exception);
+             this.generateNewProperties();
+         }
+     }
+diff --git a/main/java/net/minecraft/RecipesArmor.java b/main/java/net/minecraft/RecipesArmor.java
+index 26157e7..d35127c 100644
+--- a/main/java/net/minecraft/RecipesArmor.java
++++ b/main/java/net/minecraft/RecipesArmor.java
+@@ -3,11 +3,6 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.Block;
+-import net.minecraft.CraftingManager;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-
+ public class RecipesArmor {
+     private String[][] field_20174_a = new String[][]{{"XXX", "X X"}, {"X X", "XXX", "XXX"}, {"XXX", "X X", "X X"}, {"X X", "X X"}};
+     private Object[][] field_20173_b = new Object[][]{{Item.leather, Block.fire, Item.ingotIron, Item.diamond, Item.ingotGold}, {Item.helmetLeather, Item.helmetChain, Item.helmetSteel, Item.helmetDiamond, Item.helmetGold}, {Item.plateLeather, Item.plateChain, Item.plateSteel, Item.plateDiamond, Item.plateGold}, {Item.legsLeather, Item.legsChain, Item.legsSteel, Item.legsDiamond, Item.legsGold}, {Item.bootsLeather, Item.bootsChain, Item.bootsSteel, Item.bootsDiamond, Item.bootsGold}};
+@@ -17,7 +12,7 @@ public class RecipesArmor {
+             Object object = this.field_20173_b[0][i];
+             for (int j = 0; j < this.field_20173_b.length - 1; ++j) {
+                 Item item = (Item)this.field_20173_b[j + 1][i];
+-                craftingManager.func_20153_a(new ItemStack(item), this.field_20174_a[j], Character.valueOf('X'), object);
++                craftingManager.add(new ItemStack(item), this.field_20174_a[j], Character.valueOf('X'), object);
+             }
+         }
+     }
+diff --git a/main/java/net/minecraft/RecipesCrafting.java b/main/java/net/minecraft/RecipesCrafting.java
+index d28167f..686a7c1 100644
+--- a/main/java/net/minecraft/RecipesCrafting.java
++++ b/main/java/net/minecraft/RecipesCrafting.java
+@@ -3,15 +3,11 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.Block;
+-import net.minecraft.CraftingManager;
+-import net.minecraft.ItemStack;
+-
+ public class RecipesCrafting {
+     public void func_20115_a(CraftingManager craftingManager) {
+-        craftingManager.func_20153_a(new ItemStack(Block.crate), "###", "# #", "###", Character.valueOf('#'), Block.planks);
+-        craftingManager.func_20153_a(new ItemStack(Block.stoneOvenIdle), "###", "# #", "###", Character.valueOf('#'), Block.cobblestone);
+-        craftingManager.func_20153_a(new ItemStack(Block.workbench), "##", "##", Character.valueOf('#'), Block.planks);
++        craftingManager.add(new ItemStack(Block.crate), "###", "# #", "###", Character.valueOf('#'), Block.planks);
++        craftingManager.add(new ItemStack(Block.stoneOvenIdle), "###", "# #", "###", Character.valueOf('#'), Block.cobblestone);
++        craftingManager.add(new ItemStack(Block.workbench), "##", "##", Character.valueOf('#'), Block.planks);
+     }
+ }
+ 
+diff --git a/main/java/net/minecraft/RecipesFood.java b/main/java/net/minecraft/RecipesFood.java
+index e18beea..7a26b45 100644
+--- a/main/java/net/minecraft/RecipesFood.java
++++ b/main/java/net/minecraft/RecipesFood.java
+@@ -3,15 +3,10 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.Block;
+-import net.minecraft.CraftingManager;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-
+ public class RecipesFood {
+     public void func_20177_a(CraftingManager craftingManager) {
+-        craftingManager.func_20153_a(new ItemStack(Item.bowlSoup), "Y", "X", "#", Character.valueOf('X'), Block.mushroomBrown, Character.valueOf('Y'), Block.mushroomRed, Character.valueOf('#'), Item.bowlEmpty);
+-        craftingManager.func_20153_a(new ItemStack(Item.bowlSoup), "Y", "X", "#", Character.valueOf('X'), Block.mushroomRed, Character.valueOf('Y'), Block.mushroomBrown, Character.valueOf('#'), Item.bowlEmpty);
++        craftingManager.add(new ItemStack(Item.bowlSoup), "Y", "X", "#", Character.valueOf('X'), Block.mushroomBrown, Character.valueOf('Y'), Block.mushroomRed, Character.valueOf('#'), Item.bowlEmpty);
++        craftingManager.add(new ItemStack(Item.bowlSoup), "Y", "X", "#", Character.valueOf('X'), Block.mushroomRed, Character.valueOf('Y'), Block.mushroomBrown, Character.valueOf('#'), Item.bowlEmpty);
+     }
+ }
+ 
+diff --git a/main/java/net/minecraft/RecipesIngots.java b/main/java/net/minecraft/RecipesIngots.java
+index 6f1339e..959025a 100644
+--- a/main/java/net/minecraft/RecipesIngots.java
++++ b/main/java/net/minecraft/RecipesIngots.java
+@@ -3,11 +3,6 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.Block;
+-import net.minecraft.CraftingManager;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-
+ public class RecipesIngots {
+     private Object[][] field_20160_a = new Object[][]{{Block.blockGold, Item.ingotGold}, {Block.blockSteel, Item.ingotIron}, {Block.blockDiamond, Item.diamond}};
+ 
+@@ -15,8 +10,8 @@ public class RecipesIngots {
+         for (int i = 0; i < this.field_20160_a.length; ++i) {
+             Block block = (Block)this.field_20160_a[i][0];
+             Item item = (Item)this.field_20160_a[i][1];
+-            craftingManager.func_20153_a(new ItemStack(block), "###", "###", "###", Character.valueOf('#'), item);
+-            craftingManager.func_20153_a(new ItemStack(item, 9), "#", Character.valueOf('#'), block);
++            craftingManager.add(new ItemStack(block), "###", "###", "###", Character.valueOf('#'), item);
++            craftingManager.add(new ItemStack(item, 9), "#", Character.valueOf('#'), block);
+         }
+     }
+ }
+diff --git a/main/java/net/minecraft/RecipesTools.java b/main/java/net/minecraft/RecipesTools.java
+index 99463f3..a98020c 100644
+--- a/main/java/net/minecraft/RecipesTools.java
++++ b/main/java/net/minecraft/RecipesTools.java
+@@ -3,11 +3,6 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.Block;
+-import net.minecraft.CraftingManager;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-
+ public class RecipesTools {
+     private String[][] field_20158_a = new String[][]{{"XXX", " # ", " # "}, {"X", "#", "#"}, {"XX", "X#", " #"}, {"XX", " #", " #"}};
+     private Object[][] field_20157_b = new Object[][]{{Block.planks, Block.cobblestone, Item.ingotIron, Item.diamond, Item.ingotGold}, {Item.pickaxeWood, Item.pickaxeStone, Item.pickaxeSteel, Item.pickaxeDiamond, Item.pickaxeGold}, {Item.shovelWood, Item.shovelStone, Item.shovelSteel, Item.shovelDiamond, Item.shovelGold}, {Item.axeWood, Item.axeStone, Item.axeSteel, Item.axeDiamond, Item.axeGold}, {Item.hoeWood, Item.hoeStone, Item.hoeSteel, Item.hoeDiamond, Item.hoeGold}};
+@@ -17,7 +12,7 @@ public class RecipesTools {
+             Object object = this.field_20157_b[0][i];
+             for (int j = 0; j < this.field_20157_b.length - 1; ++j) {
+                 Item item = (Item)this.field_20157_b[j + 1][i];
+-                craftingManager.func_20153_a(new ItemStack(item), this.field_20158_a[j], Character.valueOf('#'), Item.stick, Character.valueOf('X'), object);
++                craftingManager.add(new ItemStack(item), this.field_20158_a[j], Character.valueOf('#'), Item.stick, Character.valueOf('X'), object);
+             }
+         }
+     }
+diff --git a/main/java/net/minecraft/RecipesWeapons.java b/main/java/net/minecraft/RecipesWeapons.java
+index 495fc1e..e429ad9 100644
+--- a/main/java/net/minecraft/RecipesWeapons.java
++++ b/main/java/net/minecraft/RecipesWeapons.java
+@@ -3,11 +3,6 @@
+  */
+ package net.minecraft;
+ 
+-import net.minecraft.Block;
+-import net.minecraft.CraftingManager;
+-import net.minecraft.Item;
+-import net.minecraft.ItemStack;
+-
+ public class RecipesWeapons {
+     private String[][] field_20114_a = new String[][]{{"X", "X", "#"}};
+     private Object[][] field_20113_b = new Object[][]{{Block.planks, Block.cobblestone, Item.ingotIron, Item.diamond, Item.ingotGold}, {Item.swordWood, Item.swordStone, Item.swordSteel, Item.swordDiamond, Item.swordGold}};
+@@ -17,11 +12,11 @@ public class RecipesWeapons {
+             Object object = this.field_20113_b[0][i];
+             for (int j = 0; j < this.field_20113_b.length - 1; ++j) {
+                 Item item = (Item)this.field_20113_b[j + 1][i];
+-                craftingManager.func_20153_a(new ItemStack(item), this.field_20114_a[j], Character.valueOf('#'), Item.stick, Character.valueOf('X'), object);
++                craftingManager.add(new ItemStack(item), this.field_20114_a[j], Character.valueOf('#'), Item.stick, Character.valueOf('X'), object);
+             }
+         }
+-        craftingManager.func_20153_a(new ItemStack(Item.bow, 1), " #X", "# X", " #X", Character.valueOf('X'), Item.silk, Character.valueOf('#'), Item.stick);
+-        craftingManager.func_20153_a(new ItemStack(Item.arrow, 4), "X", "#", "Y", Character.valueOf('Y'), Item.feather, Character.valueOf('X'), Item.flint, Character.valueOf('#'), Item.stick);
++        craftingManager.add(new ItemStack(Item.bow, 1), " #X", "# X", " #X", Character.valueOf('X'), Item.silk, Character.valueOf('#'), Item.stick);
++        craftingManager.add(new ItemStack(Item.arrow, 4), "X", "#", "Y", Character.valueOf('Y'), Item.feather, Character.valueOf('X'), Item.flint, Character.valueOf('#'), Item.stick);
+     }
+ }
+ 
 diff --git a/main/java/net/minecraft/ServerConfigurationManager.java b/main/java/net/minecraft/ServerConfigurationManager.java
-index 7cecbc5..7b11ad5 100644
+index 7cecbc5..a856d6b 100644
 --- a/main/java/net/minecraft/ServerConfigurationManager.java
 +++ b/main/java/net/minecraft/ServerConfigurationManager.java
-@@ -18,11 +18,11 @@ import net.minecraft.server.MinecraftServer;
+@@ -3,26 +3,24 @@
+  */
+ package net.minecraft;
+ 
+-import java.io.BufferedReader;
+-import java.io.File;
+-import java.io.FileReader;
+-import java.io.FileWriter;
+-import java.io.PrintWriter;
++import net.minecraft.server.MinecraftServer;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.io.*;
+ import java.util.ArrayList;
+ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Set;
+-import java.util.logging.Logger;
+-
+-import net.minecraft.server.MinecraftServer;
  
  public class ServerConfigurationManager {
-     public static Logger logger = Logger.getLogger("Minecraft");
+-    public static Logger logger = Logger.getLogger("Minecraft");
 -    public List playerEntities = new ArrayList();
++    public static Logger logger = LoggerFactory.getLogger("ConfigurationManager");
++    // public static Logger logger = Logger.getLogger("Minecraft");
 +    public List<EntityPlayerMP> playerEntities = new ArrayList();
      private MinecraftServer mcServer;
      private PlayerManager playerManagerObj;
@@ -124,7 +1070,7 @@ index 7cecbc5..7b11ad5 100644
      private Set<String> bannedIPs = new HashSet<>();
      private Set<String> ops = new HashSet<>();
      private File bannedPlayersFile;
-@@ -73,10 +73,11 @@ public class ServerConfigurationManager {
+@@ -73,10 +71,11 @@ public class ServerConfigurationManager {
          this.mcServer.worldMngr.func_20109_d(entityPlayerMP);
          this.playerEntities.remove(entityPlayerMP);
          this.playerManagerObj.func_9213_b(entityPlayerMP);
@@ -137,7 +1083,7 @@ index 7cecbc5..7b11ad5 100644
              netLoginHandler.kickUser("You are banned from this server!");
              return null;
          }
-@@ -147,22 +148,22 @@ public class ServerConfigurationManager {
+@@ -147,40 +146,40 @@ public class ServerConfigurationManager {
      }
  
      public void banPlayer(String string) {
@@ -164,7 +1110,12 @@ index 7cecbc5..7b11ad5 100644
              }
              bufferedReader.close();
          }
-@@ -174,7 +175,7 @@ public class ServerConfigurationManager {
+         catch (Exception exception) {
+-            logger.warning("Failed to load ban list: " + exception);
++            logger.warn("Failed to load ban list: ", exception);
+         }
+     }
+ 
      private void writeBannedPlayers() {
          try {
              PrintWriter printWriter = new PrintWriter(new FileWriter(this.bannedPlayersFile, false));
@@ -173,8 +1124,126 @@ index 7cecbc5..7b11ad5 100644
                  printWriter.println(string);
              }
              printWriter.close();
+         }
+         catch (Exception exception) {
+-            logger.warning("Failed to save ban list: " + exception);
++            logger.warn("Failed to save ban list: ", exception);
+         }
+     }
+ 
+@@ -205,7 +204,7 @@ public class ServerConfigurationManager {
+             bufferedReader.close();
+         }
+         catch (Exception exception) {
+-            logger.warning("Failed to load ip ban list: " + exception);
++            logger.warn("Failed to load ip ban list: ", exception);
+         }
+     }
+ 
+@@ -218,7 +217,7 @@ public class ServerConfigurationManager {
+             printWriter.close();
+         }
+         catch (Exception exception) {
+-            logger.warning("Failed to save ip ban list: " + exception);
++            logger.warn("Failed to save ip ban list: ", exception);
+         }
+     }
+ 
+@@ -243,7 +242,7 @@ public class ServerConfigurationManager {
+             bufferedReader.close();
+         }
+         catch (Exception exception) {
+-            logger.warning("Failed to load ip ban list: " + exception);
++            logger.warn("Failed to load ip ban list: ", exception);
+         }
+     }
+ 
+@@ -256,7 +255,7 @@ public class ServerConfigurationManager {
+             printWriter.close();
+         }
+         catch (Exception exception) {
+-            logger.warning("Failed to save ip ban list: " + exception);
++            logger.warn("Failed to save ip ban list: ", exception);
+         }
+     }
+ 
+diff --git a/main/java/net/minecraft/TileEntity.java b/main/java/net/minecraft/TileEntity.java
+index 2175b1b..3607e8b 100644
+--- a/main/java/net/minecraft/TileEntity.java
++++ b/main/java/net/minecraft/TileEntity.java
+@@ -12,8 +12,11 @@ import net.minecraft.TileEntityFurnace;
+ import net.minecraft.TileEntityMobSpawner;
+ import net.minecraft.TileEntitySign;
+ import net.minecraft.World;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public class TileEntity {
++    private static Logger logger = LoggerFactory.getLogger("TileEntity");
+     private static Map nameToClassMap = new HashMap();
+     private static Map classToNameMap = new HashMap();
+     public World worldObj;
+@@ -63,7 +66,7 @@ public class TileEntity {
+         if (tileEntity != null) {
+             tileEntity.readFromNBT(nBTTagCompound);
+         } else {
+-            System.out.println("Skipping TileEntity with id " + nBTTagCompound.getString("id"));
++            logger.warn("Skipping TileEntity with id {}", nBTTagCompound.getString("id"));
+         }
+         return tileEntity;
+     }
+diff --git a/main/java/net/minecraft/World.java b/main/java/net/minecraft/World.java
+index b1db2cb..20baf67 100644
+--- a/main/java/net/minecraft/World.java
++++ b/main/java/net/minecraft/World.java
+@@ -47,9 +47,12 @@ import net.minecraft.Vec3D;
+ import net.minecraft.WorldChunkManager;
+ import net.minecraft.WorldProvider;
+ import net.minecraft.WorldProviderHell;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ public class World
+ implements IBlockAccess {
++    private static final Logger logger = LoggerFactory.getLogger("World");
+     public boolean field_4280_a = false;
+     private List field_821_y = new ArrayList();
+     public List loadedEntityList = new ArrayList();
+@@ -701,7 +704,7 @@ implements IBlockAccess {
+         if (bl || this.chunkExists(n, n2)) {
+             if (entity instanceof EntityPlayer player) {
+                 this.playerEntities.add(player);
+-                System.out.println("Player count: " + this.playerEntities.size());
++                logger.info("Player count: {}", this.playerEntities.size());
+             }
+             this.getChunkFromChunkCoords(n, n2).addEntity(entity);
+             this.loadedEntityList.add(entity);
+diff --git a/main/java/net/minecraft/WorldGenLightStone1.java b/main/java/net/minecraft/WorldGenLightStone1.java
+index a63daf3..bee2940 100644
+--- a/main/java/net/minecraft/WorldGenLightStone1.java
++++ b/main/java/net/minecraft/WorldGenLightStone1.java
+@@ -11,7 +11,6 @@ import net.minecraft.WorldGenerator;
+ public class WorldGenLightStone1
+ extends WorldGenerator {
+     public boolean generate(World world, Random random, int n, int n2, int n3) {
+-        System.out.println("WORLDGENLIGHTSTONE1");
+         if (!world.func_20111_e(n, n2, n3)) {
+             return false;
+         }
+diff --git a/main/java/net/minecraft/WorldGenLightStone2.java b/main/java/net/minecraft/WorldGenLightStone2.java
+index fd13b57..4760330 100644
+--- a/main/java/net/minecraft/WorldGenLightStone2.java
++++ b/main/java/net/minecraft/WorldGenLightStone2.java
+@@ -11,7 +11,6 @@ import net.minecraft.WorldGenerator;
+ public class WorldGenLightStone2
+ extends WorldGenerator {
+     public boolean generate(World world, Random random, int n, int n2, int n3) {
+-        System.out.println("WORLDGENLIGHTSTONE2");
+         if (!world.func_20111_e(n, n2, n3)) {
+             return false;
+         }
 diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
-index 510c39e..8be695e 100644
+index 510c39e..afe58be 100644
 --- a/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/main/java/net/minecraft/server/MinecraftServer.java
 @@ -14,6 +14,9 @@ import java.util.HashMap;
@@ -187,7 +1256,7 @@ index 510c39e..8be695e 100644
  import net.minecraft.AxisAlignedBB;
  import net.minecraft.ConsoleLogManager;
  import net.minecraft.EntityPlayerMP;
-@@ -36,7 +39,7 @@ import net.minecraft.Vec3D;
+@@ -36,15 +39,15 @@ import net.minecraft.Vec3D;
  import net.minecraft.WorldManager;
  import net.minecraft.WorldServer;
  
@@ -195,8 +1264,9 @@ index 510c39e..8be695e 100644
 +public class MinecraftServer extends AbstractMinecraftServer
  implements ICommandListener,
  Runnable {
-     public static Logger logger = Logger.getLogger("Minecraft");
-@@ -44,7 +47,7 @@ Runnable {
+-    public static Logger logger = Logger.getLogger("Minecraft");
++    // public static Logger logger = Logger.getLogger("Minecraft");
+     public static HashMap field_6037_b = new HashMap();
      public NetworkListenThread field_6036_c;
      public PropertyManager propertyManagerObj;
      public WorldServer worldMngr;
@@ -205,7 +1275,7 @@ index 510c39e..8be695e 100644
      private boolean field_6025_n = true;
      public boolean field_6032_g = false;
      int deathTime = 0;
-@@ -62,6 +65,7 @@ Runnable {
+@@ -62,14 +65,15 @@ Runnable {
      }
  
      private boolean start() {
@@ -213,6 +1283,111 @@ index 510c39e..8be695e 100644
          ThreadCommandReader threadCommandReader = new ThreadCommandReader(this);
          threadCommandReader.setDaemon(true);
          threadCommandReader.start();
+         ConsoleLogManager.init();
+         logger.info("Starting minecraft server version Beta 1.1_02");
+         if (Runtime.getRuntime().maxMemory() / 1024L / 1024L < 512L) {
+-            logger.warning("**** NOT ENOUGH RAM!");
+-            logger.warning("To start the server with more ram, launch it as \"java -Xmx1024M -Xms1024M -jar minecraft_server.jar\"");
++            logger.warn("**** NOT ENOUGH RAM!");
++            logger.warn("To start the server with more ram, launch it as \"java -Xmx1024M -Xms1024M -jar minecraft_server.jar\"");
+         }
+         logger.info("Loading properties");
+         this.propertyManagerObj = new PropertyManager(new File("server.properties"));
+@@ -82,8 +86,8 @@ Runnable {
+             try {
+                 inetAddress = InetAddress.getByName(string);
+             } catch(UnknownHostException e) {
+-                logger.warning("**** FAILED TO BIND TO HOST!");
+-                logger.log(Level.WARNING, "The exception was: " + e.toString());
++                logger.warn("**** FAILED TO BIND TO HOST!");
++                logger.warn("The exception was: ", e);
+             }
+         }
+         int n = this.propertyManagerObj.getIntProperty("server-port", 25565);
+@@ -92,16 +96,16 @@ Runnable {
+             this.field_6036_c = new NetworkListenThread(this, inetAddress, n);
+         }
+         catch (IOException iOException) {
+-            logger.warning("**** FAILED TO BIND TO PORT!");
+-            logger.log(Level.WARNING, "The exception was: " + iOException.toString());
+-            logger.warning("Perhaps a server is already running on that port?");
++            logger.warn("**** FAILED TO BIND TO PORT!");
++            logger.warn("The exception was: ", iOException);
++            logger.warn("Perhaps a server is already running on that port?");
+             return false;
+         }
+         if (!this.onlineMode) {
+-            logger.warning("**** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!");
+-            logger.warning("The server will make no attempt to authenticate usernames. Beware.");
+-            logger.warning("While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.");
+-            logger.warning("To change this, set \"online-mode\" to \"true\" in the server.settings file.");
++            logger.warn("**** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!");
++            logger.warn("The server will make no attempt to authenticate usernames. Beware.");
++            logger.warn("While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.");
++            logger.warn("To change this, set \"online-mode\" to \"true\" in the server.settings file.");
+         }
+         this.configManager = new ServerConfigurationManager(this);
+         this.field_6028_k = new EntityTracker(this);
+@@ -134,7 +138,7 @@ Runnable {
+     private void func_6019_a(String string, int n) {
+         this.field_9013_i = string;
+         this.field_9012_j = n;
+-        System.out.println(string + ": " + n + "%");
++        logger.info("{}: {}%", string, n);
+     }
+ 
+     private void func_6011_e() {
+@@ -173,11 +177,11 @@ Runnable {
+                     long l3 = System.currentTimeMillis();
+                     long l4 = l3 - l;
+                     if (l4 > 2000L) {
+-                        logger.warning("Can't keep up! Did the system time change, or is the server overloaded?");
++                        logger.warn("Can't keep up! Did the system time change, or is the server overloaded?");
+                         l4 = 2000L;
+                     }
+                     if (l4 < 0L) {
+-                        logger.warning("Time ran backwards! Did the system time change?");
++                        logger.warn("Time ran backwards! Did the system time change?");
+                         l4 = 0L;
+                     }
+                     l2 += l4;
+@@ -202,7 +206,7 @@ Runnable {
+         }
+         catch (Exception exception) {
+             exception.printStackTrace();
+-            logger.log(Level.SEVERE, "Unexpected exception", exception);
++            logger.error("Unexpected exception", exception);
+             while (this.field_6025_n) {
+                 this.commandLineParser();
+                 try {
+@@ -254,7 +258,7 @@ Runnable {
+             this.commandLineParser();
+         }
+         catch (Exception exception) {
+-            logger.log(Level.WARNING, "Unexpected exception while parsing console command", exception);
++            logger.warn("Unexpected exception while parsing console command", exception);
+         }
+     }
+ 
+@@ -476,13 +480,14 @@ Runnable {
+     public static void main(String[] stringArray) {
+         try {
+             MinecraftServer minecraftServer = new MinecraftServer();
+-            if (!(GraphicsEnvironment.isHeadless() || stringArray.length > 0 && stringArray[0].equals("nogui"))) {
+-                ServerGUI.initGui(minecraftServer);
+-            }
++            // Dart - Remove GUI. We make pretty breaking changes that aren't worth fixing the GUI for.
++            //if (!(GraphicsEnvironment.isHeadless() || stringArray.length > 0 && stringArray[0].equals("nogui"))) {
++            //    ServerGUI.initGui(minecraftServer);
++            //}
+             new ThreadServerApplication("Server thread", minecraftServer).start();
+         }
+         catch (Exception exception) {
+-            logger.log(Level.SEVERE, "Failed to start the minecraft server", exception);
++            logger.warn("Failed to start the minecraft server", exception);
+         }
+     }
+ 
 -- 
 2.36.1
 

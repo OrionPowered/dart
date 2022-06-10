@@ -25,18 +25,16 @@ public class TestPlugin extends DartPlugin<Server.V1> {
 
     @Override
     public void onEnable() {
-        System.out.println("ENABLED!");
         listen(PlayerChatEvent.class, e -> {
-            System.out.println("CHAT: " + e.getMessage());
+            getLogger().info("Chat event: {}", e.getMessage());
         });
 
         listen(PlayerJoinEvent.class, e -> {
-            System.out.println(e.getPlayer().getUsername());
+            getLogger().info("Player join event: {}", e.getPlayer().getUsername());
         });
     }
 
     @Override
     public void onDisable() {
-        System.out.println("DISABLED!");
     }
 }
