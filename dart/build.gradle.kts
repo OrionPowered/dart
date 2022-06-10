@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":api"))
-    implementation("com.alexsobiek:async:7cd100b5df")
-    implementation("com.electronwill.night-config:toml:3.6.5")
+    implementation("ch.qos.logback:logback-classic:${project.property("logback_version")}")
+    implementation("com.alexsobiek:async:${project.property("async_version")}")
+    implementation("com.electronwill.night-config:toml:${project.property("nightconfig_version")}")
 }
