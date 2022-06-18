@@ -1,6 +1,7 @@
-package com.github.quillmc.dart.api.plugin;
+package com.github.quillmc.dart.plugin;
 
 import com.alexsobiek.nexus.inject.dependency.DependencyProvider;
+import com.alexsobiek.nexus.lazy.Lazy;
 import com.github.quillmc.dart.api.Server;
 import org.slf4j.Logger;
 
@@ -15,7 +16,10 @@ public class PluginDependencyProvider extends DependencyProvider {
     public DependencyProvider forPlugin(File dataFolder, Logger logger) {
         SinglePluginDependencyProvider provider = new SinglePluginDependencyProvider(this) {
         };
-        provider.supply(File.class, "dataFolder", () -> dataFolder);
+        provider.supply(Lazy.class, "dataFolder", () -> new Lazy<>(() -> {
+            if (!dataFolder.exists()) dataFolder.mkdirs();
+            return dataFolder;
+        }));
         provider.supply(Logger.class, () -> logger);
         return provider;
     }

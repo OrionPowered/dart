@@ -6,7 +6,6 @@ import com.alexsobiek.nexus.plugin.loader.PluginContainer;
 import com.github.quillmc.dart.DartServer;
 import com.github.quillmc.dart.api.Server;
 import com.github.quillmc.dart.api.plugin.DartPlugin;
-import com.github.quillmc.dart.api.plugin.PluginDependencyProvider;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
