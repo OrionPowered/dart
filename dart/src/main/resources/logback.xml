@@ -1,6 +1,5 @@
-
 <configuration>
-    <property name="HOME_LOG" value="logs/orion.log"/>
+    <property name="HOME_LOG" value="logs/dart.log"/>
     <conversionRule conversionWord="color" converterClass="com.github.quillmc.dart.logger.ColorLoggerConverter"/>
     <conversionRule conversionWord="reset" converterClass="com.github.quillmc.dart.logger.ResetLoggerConverter"/>
 
@@ -16,7 +15,7 @@
         <file>${HOME_LOG}</file>
 
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>logs/archived/orion.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <fileNamePattern>logs/archived/dart.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <!-- each archived file, size max 10MB -->
             <maxFileSize>10MB</maxFileSize>
             <!-- total size of all archive files, if total size > 20GB, it will delete old archived file -->
@@ -30,7 +29,7 @@
         </encoder>
     </appender>
 
-    <root>
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE-ROLLING"/>
     </root>
