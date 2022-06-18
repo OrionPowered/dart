@@ -36,9 +36,10 @@ public abstract class DartServer<P extends Player> implements Server<P> {
         pluginManager = new DartPluginManager(this);
         pluginFramework = nexus.library(NexusPluginFramework.builder()
                 .manager(pluginManager)
-                .processImmediately(true)
                 .withDirectory(pluginManager.getPluginsDir().toPath())
                 .build());
+        logger.info("Loading plugins");
+        pluginFramework.findAndLoadPlugins();
     }
 
     public void onReady() {
