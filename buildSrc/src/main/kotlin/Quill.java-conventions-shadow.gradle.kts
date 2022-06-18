@@ -9,10 +9,6 @@ tasks {
     }
 
     shadowJar {
-        minimize() {
-            exclude(dependency("ch.qos.logback:logback-classic"))
-            exclude(dependency("com.electronwill.night-config:toml"))
-        }
         archiveClassifier.set("shaded")
     }
 
