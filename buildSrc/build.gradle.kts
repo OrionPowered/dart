@@ -15,7 +15,7 @@ dependencies {
     implementation("gradle.plugin.com.github.johnrengelman:shadow:7.1.2")
     implementation("gradle.plugin.com.github.monosoul:yadegrap:1.0.0")
     implementation("org.eclipse.jgit:org.eclipse.jgit:6.1.0.202203080745-r")
-    implementation("com.github.QuillMC:TinyMCP:6b7af2d257")
+    implementation("com.github.QuillMC:TinyMCP:e46a0a9007")
     implementation("net.fabricmc:cfr:0.1.1")
 }
 
