@@ -25,7 +25,12 @@ public class ChatColor {
     public static ChatColor ITALIC = new ChatColor("\u00a7o");
     public static ChatColor RESET = new ChatColor("\u00a7r");
 
+    public static String translateColor(char c, String msg) {
+        return msg.replace(c, '§');
+    }
+
     private final String hex;
+
     protected ChatColor(String hex) {
         this.hex = hex;
     }
