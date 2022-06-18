@@ -1,9 +1,13 @@
 import com.github.quillmc.tinymcp.Version
 
 plugins {
-    java
-    id("Quill.java-conventions")
+    application
+    id("Quill.java-conventions-shadow")
     id("devtools")
+}
+
+application {
+    mainClass.set("net.minecraft.server.MinecraftServer")
 }
 
 dart {
@@ -11,6 +15,9 @@ dart {
 }
 
 dependencies {
-    api(project(":api"))
     implementation(project(":dart"))
+    compileOnly(project(":api"))
+    compileOnly("ch.qos.logback:logback-classic:${project.property("logback_version")}")
+    compileOnly("com.alexsobiek.nexus:core:${project.property("nexus_version")}")
+    compileOnly("com.electronwill.night-config:toml:${project.property("nightconfig_version")}")
 }
