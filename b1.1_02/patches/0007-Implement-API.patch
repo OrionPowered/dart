@@ -1,4 +1,4 @@
-From 884d6d15a1c752116e26a139abdcc64e58fe89fc Mon Sep 17 00:00:00 2001
+From 764db95feb8895327e01dfa2283994c4d1364459 Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Thu, 9 Jun 2022 04:23:51 -0500
 Subject: [PATCH] Implement API
@@ -30,13 +30,13 @@ Subject: [PATCH] Implement API
  main/java/net/minecraft/World.java            |   5 +-
  .../net/minecraft/WorldGenLightStone1.java    |   1 -
  .../net/minecraft/WorldGenLightStone2.java    |   1 -
- .../net/minecraft/server/MinecraftServer.java |  51 ++++----
- 27 files changed, 289 insertions(+), 255 deletions(-)
+ .../net/minecraft/server/MinecraftServer.java |  58 ++++-----
+ 27 files changed, 291 insertions(+), 260 deletions(-)
  create mode 100644 main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 
 diff --git a/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 new file mode 100644
-index 0000000..12369dd
+index 0000000..690c68b
 --- /dev/null
 +++ b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 @@ -0,0 +1,42 @@
@@ -75,7 +75,7 @@ index 0000000..12369dd
 +    }
 +
 +    public void broadcast(String msg) {
-+        broadcastPlain(String.format("%s[%sQuill%s]%s %s", ChatColor.DARK_GRAY, ChatColor.GOLD, ChatColor.DARK_GRAY, ChatColor.RESET, msg));
++        broadcastPlain(String.format("%s[%sDart%s]%s %s", ChatColor.DARK_GRAY, ChatColor.GOLD, ChatColor.DARK_GRAY, ChatColor.RESET, msg));
 +    }
 +
 +    public void broadcastPlain(String msg) {
@@ -1243,20 +1243,37 @@ index fd13b57..4760330 100644
              return false;
          }
 diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
-index 510c39e..afe58be 100644
+index 510c39e..e1d90bb 100644
 --- a/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/main/java/net/minecraft/server/MinecraftServer.java
-@@ -14,6 +14,9 @@ import java.util.HashMap;
+@@ -3,7 +3,6 @@
+  */
+ package net.minecraft.server;
+ 
+-import java.awt.GraphicsEnvironment;
+ import java.io.File;
+ import java.io.IOException;
+ import java.net.InetAddress;
+@@ -12,8 +11,8 @@ import java.util.ArrayList;
+ import java.util.Collections;
+ import java.util.HashMap;
  import java.util.List;
- import java.util.logging.Level;
- import java.util.logging.Logger;
+-import java.util.logging.Level;
+-import java.util.logging.Logger;
 +
 +import com.github.quillmc.dart.AbstractMinecraftServer;
-+import com.github.quillmc.dart.DartServer;
  import net.minecraft.AxisAlignedBB;
  import net.minecraft.ConsoleLogManager;
  import net.minecraft.EntityPlayerMP;
-@@ -36,15 +39,15 @@ import net.minecraft.Vec3D;
+@@ -28,7 +27,6 @@ import net.minecraft.Packet4UpdateTime;
+ import net.minecraft.PropertyManager;
+ import net.minecraft.ServerCommand;
+ import net.minecraft.ServerConfigurationManager;
+-import net.minecraft.ServerGUI;
+ import net.minecraft.ThreadCommandReader;
+ import net.minecraft.ThreadServerApplication;
+ import net.minecraft.ThreadSleepForever;
+@@ -36,15 +34,15 @@ import net.minecraft.Vec3D;
  import net.minecraft.WorldManager;
  import net.minecraft.WorldServer;
  
@@ -1275,7 +1292,7 @@ index 510c39e..afe58be 100644
      private boolean field_6025_n = true;
      public boolean field_6032_g = false;
      int deathTime = 0;
-@@ -62,14 +65,15 @@ Runnable {
+@@ -62,14 +60,15 @@ Runnable {
      }
  
      private boolean start() {
@@ -1293,7 +1310,7 @@ index 510c39e..afe58be 100644
          }
          logger.info("Loading properties");
          this.propertyManagerObj = new PropertyManager(new File("server.properties"));
-@@ -82,8 +86,8 @@ Runnable {
+@@ -82,8 +81,8 @@ Runnable {
              try {
                  inetAddress = InetAddress.getByName(string);
              } catch(UnknownHostException e) {
@@ -1304,7 +1321,7 @@ index 510c39e..afe58be 100644
              }
          }
          int n = this.propertyManagerObj.getIntProperty("server-port", 25565);
-@@ -92,16 +96,16 @@ Runnable {
+@@ -92,22 +91,23 @@ Runnable {
              this.field_6036_c = new NetworkListenThread(this, inetAddress, n);
          }
          catch (IOException iOException) {
@@ -1328,7 +1345,15 @@ index 510c39e..afe58be 100644
          }
          this.configManager = new ServerConfigurationManager(this);
          this.field_6028_k = new EntityTracker(this);
-@@ -134,7 +138,7 @@ Runnable {
+         String string2 = this.propertyManagerObj.getStringProperty("level-name", "world");
+-        logger.info("Preparing level \"" + string2 + "\"");
++        logger.info("Preparing level {}", string2);
+         this.preareSpawn(string2);
++        super.onReady(); // Dart
+         logger.info("Done! For help, type \"help\" or \"?\"");
+         return true;
+     }
+@@ -134,7 +134,7 @@ Runnable {
      private void func_6019_a(String string, int n) {
          this.field_9013_i = string;
          this.field_9012_j = n;
@@ -1337,7 +1362,15 @@ index 510c39e..afe58be 100644
      }
  
      private void func_6011_e() {
-@@ -173,11 +177,11 @@ Runnable {
+@@ -149,6 +149,7 @@ Runnable {
+ 
+     private void stop() {
+         logger.info("Stopping server");
++        super.onStop(); // Dart
+         if (this.configManager != null) {
+             this.configManager.savePlayerStates();
+         }
+@@ -173,11 +174,11 @@ Runnable {
                      long l3 = System.currentTimeMillis();
                      long l4 = l3 - l;
                      if (l4 > 2000L) {
@@ -1351,7 +1384,7 @@ index 510c39e..afe58be 100644
                          l4 = 0L;
                      }
                      l2 += l4;
-@@ -202,7 +206,7 @@ Runnable {
+@@ -202,7 +203,7 @@ Runnable {
          }
          catch (Exception exception) {
              exception.printStackTrace();
@@ -1360,7 +1393,7 @@ index 510c39e..afe58be 100644
              while (this.field_6025_n) {
                  this.commandLineParser();
                  try {
-@@ -254,7 +258,7 @@ Runnable {
+@@ -254,7 +255,7 @@ Runnable {
              this.commandLineParser();
          }
          catch (Exception exception) {
@@ -1369,7 +1402,7 @@ index 510c39e..afe58be 100644
          }
      }
  
-@@ -476,13 +480,14 @@ Runnable {
+@@ -476,13 +477,14 @@ Runnable {
      public static void main(String[] stringArray) {
          try {
              MinecraftServer minecraftServer = new MinecraftServer();
