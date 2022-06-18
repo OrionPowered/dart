@@ -1,6 +1,6 @@
 package devtools;
 
-import com.alexsobiek.async.util.Lazy;
+import com.alexsobiek.nexus.lazy.Lazy;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.eclipse.jgit.api.Git;

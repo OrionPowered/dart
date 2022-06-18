@@ -1,6 +1,6 @@
 package com.github.quillmc.dart.api;
 
-import com.alexsobiek.async.event.EventBus;
+import com.alexsobiek.nexus.event.EventBus;
 import com.github.quillmc.dart.api.chat.ChatFormatter;
 import com.github.quillmc.dart.api.entity.Player;
 
