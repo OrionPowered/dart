@@ -1,10 +1,10 @@
-From 764db95feb8895327e01dfa2283994c4d1364459 Mon Sep 17 00:00:00 2001
+From 909bd6ed95c4f08c939dc608bc8820ef62d26745 Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
 Date: Thu, 9 Jun 2022 04:23:51 -0500
 Subject: [PATCH] Implement API
 
 ---
- .../quillmc/dart/AbstractMinecraftServer.java |  42 +++++++
+ .../quillmc/dart/AbstractMinecraftServer.java |  45 +++++++
  main/java/net/minecraft/BlockPortal.java      |   2 +-
  main/java/net/minecraft/Chunk.java            |   7 +-
  main/java/net/minecraft/ChunkLoader.java      |   9 +-
@@ -31,15 +31,15 @@ Subject: [PATCH] Implement API
  .../net/minecraft/WorldGenLightStone1.java    |   1 -
  .../net/minecraft/WorldGenLightStone2.java    |   1 -
  .../net/minecraft/server/MinecraftServer.java |  58 ++++-----
- 27 files changed, 291 insertions(+), 260 deletions(-)
+ 27 files changed, 294 insertions(+), 260 deletions(-)
  create mode 100644 main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 
 diff --git a/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 new file mode 100644
-index 0000000..690c68b
+index 0000000..7d747c9
 --- /dev/null
 +++ b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,45 @@
 +package com.github.quillmc.dart;
 +
 +import com.github.quillmc.dart.api.entity.Player;
@@ -79,7 +79,10 @@ index 0000000..690c68b
 +    }
 +
 +    public void broadcastPlain(String msg) {
-+        configManager.sendChatMessageToAllPlayers(msg);
++        Packet3Chat packet = new Packet3Chat(msg);
++        configManager.playerEntities.forEach(p -> {
++            p.netServerHandler.sendPacket(packet);
++        });
 +    }
 +}
 diff --git a/main/java/net/minecraft/BlockPortal.java b/main/java/net/minecraft/BlockPortal.java
