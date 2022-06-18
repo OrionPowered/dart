@@ -2,6 +2,7 @@ package com.github.quillmc.dart.api.plugin;
 
 import com.alexsobiek.nexus.event.Event;
 import com.alexsobiek.nexus.inject.annotation.Inject;
+import com.alexsobiek.nexus.lazy.Lazy;
 import com.alexsobiek.nexus.plugin.NexusPlugin;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.file.FileNotFoundAction;
@@ -11,15 +12,18 @@ import org.slf4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Vector;
 import java.util.function.Consumer;
 
 public abstract class DartPlugin<S extends Server<?>> implements NexusPlugin {
+    private final Vector<Runnable> reloadListeners = new Vector<>();
+
     @Inject
     protected Server<?> server;
     @Inject
     protected Logger logger;
     @Inject(identifier = "dataFolder")
-    protected File dataFolder;
+    private Lazy<File> dataFolder;
 
     /**
      * Returns this server
@@ -45,7 +49,12 @@ public abstract class DartPlugin<S extends Server<?>> implements NexusPlugin {
      * @return File
      */
     public File getDataFolder() {
-        return dataFolder;
+        return dataFolder.get();
+    }
+
+    public void doReload() {
+        reloadListeners.forEach(Runnable::run);
+        onReload();
     }
 
     /**
@@ -63,6 +72,7 @@ public abstract class DartPlugin<S extends Server<?>> implements NexusPlugin {
                     .build();
             config.load();
             is.close();
+            reloadListeners.add(config::load);
             return config;
         } catch (IOException e) {
             e.printStackTrace();
