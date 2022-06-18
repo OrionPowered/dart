@@ -1,0 +1,9 @@
+[discord]
+token = ""
+channel = ""
+
+[chat]
+startup = "✅ **Server has started.**"
+shutdown = "❌ **Server has shutdown.**"
+minecraftformat="&8[&9D&8] &r{username}: {message}"
+minecrafthead="https://minotar.net/avatar/{username}/128"
