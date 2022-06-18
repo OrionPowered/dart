@@ -1,14 +1,16 @@
 package com.github.quillmc.dart;
 
-import com.alexsobiek.async.AsyncUtility;
-import com.alexsobiek.async.event.EventBus;
+import ch.qos.logback.classic.Level;
+import com.alexsobiek.nexus.Nexus;
+import com.alexsobiek.nexus.event.EventBus;
+import com.alexsobiek.nexus.plugin.NexusPluginFramework;
 import com.github.quillmc.dart.api.Server;
+import com.github.quillmc.dart.api.chat.ChatFormatter;
 import com.github.quillmc.dart.api.entity.Player;
 import com.github.quillmc.dart.api.event.PlayerChatEvent;
 import com.github.quillmc.dart.api.event.PlayerJoinEvent;
 import com.github.quillmc.dart.api.event.PlayerLeaveEvent;
-import com.github.quillmc.dart.api.chat.ChatFormatter;
-import com.github.quillmc.dart.plugin.PluginLoader;
+import com.github.quillmc.dart.plugin.DartPluginManager;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -21,19 +23,35 @@ import java.util.Optional;
 @Getter
 public abstract class DartServer<P extends Player> implements Server<P> {
     protected static final Logger logger = LoggerFactory.getLogger("Dart");
-    private final AsyncUtility async = AsyncUtility.builder().build();
+    private final Nexus nexus = Nexus.builder().build();
+    private NexusPluginFramework pluginFramework;
+    private DartPluginManager pluginManager;
     private ChatFormatter<P> chatFormatter = (ChatFormatter<P>) ChatFormatter.DEFAULT;
-    private PluginLoader pluginLoader;
 
     @SneakyThrows
     public void preStart() {
+        ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        root.setLevel(Level.INFO);
         logger.info("Starting Dart");
-        pluginLoader = new PluginLoader(this);
+        pluginManager = new DartPluginManager(this);
+        pluginFramework = nexus.library(NexusPluginFramework.builder()
+                .manager(pluginManager)
+                .processImmediately(true)
+                .withDirectory(pluginManager.getPluginsDir().toPath())
+                .build());
+    }
+
+    public void onReady() {
+        pluginManager.enableAll();
+    }
+
+    public void onStop() {
+        pluginManager.disableAll();
     }
 
     @Override
     public EventBus getEventBus() {
-        return async.eventBus();
+        return nexus.eventBus();
     }
 
     @SneakyThrows

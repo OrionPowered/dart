@@ -4,5 +4,5 @@ plugins {
 }
 
 dependencies {
-    api(project(":api"))
+    compileOnly(project(":api"))
 }
