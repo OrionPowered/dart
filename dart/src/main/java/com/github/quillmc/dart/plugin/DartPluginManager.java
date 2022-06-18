@@ -30,7 +30,7 @@ public class DartPluginManager extends PluginManager<DartPlugin<? extends Server
 
     @Override
     protected DartPlugin<? extends Server<?>> construct(PluginContainer<DartPlugin<? extends Server<?>>> container) {
-        String name = container.getInfo().name().replace("\s+", "");
+        String name = container.getInfo().name().replaceAll("\\s+", "");
         logger.info("Loading plugin {} version {} by {}", name, container.getInfo().version(), container.getInfo().authors());
         Logger logger = LoggerFactory.getLogger(name);
         File dataFolder = new File(pluginsDir, name);
