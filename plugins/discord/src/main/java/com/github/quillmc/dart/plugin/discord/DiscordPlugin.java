@@ -77,7 +77,7 @@ public class DiscordPlugin extends DartPlugin<Server.All> {
     private Webhook getWebhook(GatewayDiscordClient client) {
         WebhookService webhookService = gateway.getRestClient().getWebhookService();
         WebhookData webhookData;
-        webhookData = webhookService.getChannelWebhooks(channelId).filter(w -> w.name().isPresent() && w.name().equals("DartDiscord")).blockFirst();
+        webhookData = webhookService.getChannelWebhooks(channelId).filter(w -> w.name().isPresent() && w.name().get().equals("DartDiscord")).blockFirst();
         if (webhookData == null) // webhook doesn't exist, create one
             webhookData = webhookService.createWebhook(channelId, WebhookCreateRequest.builder().name("DartDiscord").build(), "Dart Discord Plugin").block();
         return client.getWebhookById(Snowflake.of(webhookData.id())).block();
