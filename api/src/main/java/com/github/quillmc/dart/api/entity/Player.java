@@ -5,5 +5,7 @@ public interface Player {
 
     boolean isSneaking();
 
+    boolean isOp();
+
     void sendMessage(String message);
 }
