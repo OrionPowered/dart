@@ -8,6 +8,7 @@ import com.github.quillmc.dart.api.event.PlayerChatEvent;
 import com.github.quillmc.dart.api.event.PlayerJoinEvent;
 import com.github.quillmc.dart.api.event.PlayerLeaveEvent;
 import discord4j.core.event.domain.message.MessageCreateEvent;
+import discord4j.core.object.entity.Message;
 import discord4j.core.object.entity.Webhook;
 import discord4j.core.object.entity.channel.Channel;
 import discord4j.discordjson.json.EmbedAuthorData;
@@ -51,11 +52,13 @@ public class ChatService {
     }
 
     public void onDiscordMessage(MessageCreateEvent event) {
+        Message message = event.getMessage();
+        if (message.getChannelId().asLong() != channel.getId().asLong()) return;
         event.getMember().ifPresent(member -> {
             if (!member.isBot()) {
                 server.broadcastPlain(ChatColor.translateColor('&', config.get("chat.minecraftformat"))
                         .replace("{username}", member.getUsername())
-                        .replace("{message}", event.getMessage().getContent()));
+                        .replace("{message}", message.getContent()));
             }
         });
     }
