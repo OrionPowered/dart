@@ -5,13 +5,11 @@ import com.alexsobiek.nexus.inject.annotation.Inject;
 import com.alexsobiek.nexus.lazy.Lazy;
 import com.alexsobiek.nexus.plugin.NexusPlugin;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
-import com.electronwill.nightconfig.core.file.FileNotFoundAction;
 import com.github.quillmc.dart.api.Server;
+import com.github.quillmc.dart.api.util.ConfigUtil;
 import org.slf4j.Logger;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Vector;
 import java.util.function.Consumer;
 
@@ -65,19 +63,10 @@ public abstract class DartPlugin<S extends Server<?>> implements NexusPlugin {
      * @return CommentedFileConfig
      */
     public CommentedFileConfig getConfig(File file, String path) {
-        try (InputStream is = getClass().getResourceAsStream((path.startsWith("/") ? path : "/" + path))) {
-            CommentedFileConfig config = CommentedFileConfig.builder(file)
-                    .onFileNotFound(FileNotFoundAction.copyData(is))
-                    .autosave()
-                    .build();
-            config.load();
-            is.close();
-            reloadListeners.add(config::load);
-            return config;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null; // Should never reach this point, an exception should be thrown
+        CommentedFileConfig config = ConfigUtil.getConfig(getClass(), file, path);
+        System.out.println(config);
+        reloadListeners.add(config::load);
+        return config;
     }
 
     /**

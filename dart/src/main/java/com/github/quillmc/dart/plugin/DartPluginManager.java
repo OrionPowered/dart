@@ -32,7 +32,7 @@ public class DartPluginManager extends PluginManager<DartPlugin<? extends Server
         String name = container.getInfo().name().replaceAll("\\s+", "");
         logger.info("Loading plugin {} version {} by {}", name, container.getInfo().version(), container.getInfo().authors());
         Logger logger = LoggerFactory.getLogger(name);
-        File dataFolder = new File(pluginsDir, name);
+        File dataFolder = new File(pluginsDir.getAbsolutePath(), name);
         DartPlugin<?> pl;
         try {
             Optional<DartPlugin<?>> opt = newInstance(container.getMainClass(), dependencyProvider.forPlugin(dataFolder, logger)).get();

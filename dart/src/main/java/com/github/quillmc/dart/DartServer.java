@@ -4,12 +4,14 @@ import ch.qos.logback.classic.Level;
 import com.alexsobiek.nexus.Nexus;
 import com.alexsobiek.nexus.event.EventBus;
 import com.alexsobiek.nexus.plugin.NexusPluginFramework;
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.github.quillmc.dart.api.Server;
 import com.github.quillmc.dart.api.chat.ChatFormatter;
 import com.github.quillmc.dart.api.entity.Player;
 import com.github.quillmc.dart.api.event.PlayerChatEvent;
 import com.github.quillmc.dart.api.event.PlayerJoinEvent;
 import com.github.quillmc.dart.api.event.PlayerLeaveEvent;
+import com.github.quillmc.dart.api.util.ConfigUtil;
 import com.github.quillmc.dart.plugin.DartPluginManager;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,6 +19,7 @@ import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Optional;
 
 @Setter
@@ -24,6 +27,7 @@ import java.util.Optional;
 public abstract class DartServer<P extends Player> implements Server<P> {
     protected static final Logger logger = LoggerFactory.getLogger("Dart");
     private final Nexus nexus = Nexus.builder().build();
+    private final CommentedFileConfig config = ConfigUtil.getConfig(DartServer.class, new File("dart.toml"), "dart.toml");
     private NexusPluginFramework pluginFramework;
     private DartPluginManager pluginManager;
     private ChatFormatter<P> chatFormatter = (ChatFormatter<P>) ChatFormatter.DEFAULT;
