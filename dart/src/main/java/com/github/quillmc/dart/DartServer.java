@@ -37,6 +37,10 @@ public abstract class DartServer<P extends Player> implements Server<P> {
         ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
         root.setLevel(Level.INFO);
         logger.info("Starting Dart");
+        if (config == null) {
+            logger.error("Failed getting dart.toml config");
+            stop();
+        }
         pluginManager = new DartPluginManager(this);
         pluginFramework = nexus.library(NexusPluginFramework.builder()
                 .manager(pluginManager)
