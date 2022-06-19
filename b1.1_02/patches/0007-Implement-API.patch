@@ -1,6 +1,6 @@
-From 909bd6ed95c4f08c939dc608bc8820ef62d26745 Mon Sep 17 00:00:00 2001
+From a457ca8b900067ed8476d889fd7acdc7de245033 Mon Sep 17 00:00:00 2001
 From: Alex Sobiek <alex@alexsobiek.com>
-Date: Thu, 9 Jun 2022 04:23:51 -0500
+Date: Sat, 18 Jun 2022 19:53:57 -0500
 Subject: [PATCH] Implement API
 
 ---
@@ -10,9 +10,10 @@ Subject: [PATCH] Implement API
  main/java/net/minecraft/ChunkLoader.java      |   9 +-
  main/java/net/minecraft/CraftingManager.java  | 111 ++++++++----------
  main/java/net/minecraft/EntityList.java       |   5 +-
+ main/java/net/minecraft/EntityPlayerMP.java   |   4 +
  .../net/minecraft/GuiLogOutputHandler.java    |  19 ++-
  main/java/net/minecraft/NetLoginHandler.java  |  19 +--
- main/java/net/minecraft/NetServerHandler.java |  73 ++++++------
+ main/java/net/minecraft/NetServerHandler.java |  83 +++++++------
  .../net/minecraft/NetworkAcceptThread.java    |   2 +-
  .../net/minecraft/NetworkListenThread.java    |  50 ++++----
  main/java/net/minecraft/Packet.java           |   5 +-
@@ -30,13 +31,13 @@ Subject: [PATCH] Implement API
  main/java/net/minecraft/World.java            |   5 +-
  .../net/minecraft/WorldGenLightStone1.java    |   1 -
  .../net/minecraft/WorldGenLightStone2.java    |   1 -
- .../net/minecraft/server/MinecraftServer.java |  58 ++++-----
- 27 files changed, 294 insertions(+), 260 deletions(-)
+ .../net/minecraft/server/MinecraftServer.java |  60 +++++-----
+ 28 files changed, 304 insertions(+), 266 deletions(-)
  create mode 100644 main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 
 diff --git a/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 new file mode 100644
-index 0000000..7d747c9
+index 0000000..5d10634
 --- /dev/null
 +++ b/main/java/com/github/quillmc/dart/AbstractMinecraftServer.java
 @@ -0,0 +1,45 @@
@@ -51,7 +52,7 @@ index 0000000..7d747c9
 +import java.util.Optional;
 +
 +// Here lies the majority of API implementations
-+public class AbstractMinecraftServer extends DartServer<Player> {
++public abstract class AbstractMinecraftServer extends DartServer<Player> {
 +    public ServerConfigurationManager configManager;
 +
 +    public Optional<EntityPlayerMP> getPlayer(String username) {
@@ -338,6 +339,21 @@ index f14804c..c20d8d5 100644
          }
          return entity;
      }
+diff --git a/main/java/net/minecraft/EntityPlayerMP.java b/main/java/net/minecraft/EntityPlayerMP.java
+index 9ffc61f..53687c9 100644
+--- a/main/java/net/minecraft/EntityPlayerMP.java
++++ b/main/java/net/minecraft/EntityPlayerMP.java
+@@ -275,6 +275,10 @@ public class EntityPlayerMP
+         netServerHandler.sendPacket(new Packet3Chat(message));
+     }
+ 
++    public boolean isOp() {
++        return mcServer.configManager.isOp(username);
++    }
++
+     // Dart - End API methods
+ }
+ 
 diff --git a/main/java/net/minecraft/GuiLogOutputHandler.java b/main/java/net/minecraft/GuiLogOutputHandler.java
 index a341bdf..2974f7f 100644
 --- a/main/java/net/minecraft/GuiLogOutputHandler.java
@@ -428,7 +444,7 @@ index acfab40..6cdbdd2 100644
              netServerHandler.func_41_a(entityPlayerMP.posX, entityPlayerMP.posY, entityPlayerMP.posZ, entityPlayerMP.rotationYaw, entityPlayerMP.rotationPitch);
              this.mcServer.field_6036_c.func_4108_a(netServerHandler);
 diff --git a/main/java/net/minecraft/NetServerHandler.java b/main/java/net/minecraft/NetServerHandler.java
-index 3d9fe4d..c249a27 100644
+index 3d9fe4d..c602f59 100644
 --- a/main/java/net/minecraft/NetServerHandler.java
 +++ b/main/java/net/minecraft/NetServerHandler.java
 @@ -3,27 +3,29 @@
@@ -500,14 +516,16 @@ index 3d9fe4d..c249a27 100644
      }
  
      public void handleBlockDig(Packet14BlockDig packet14BlockDig) {
-@@ -177,10 +179,7 @@ implements ICommandListener {
+@@ -176,11 +178,8 @@ implements ICommandListener {
+             this.playerEntity.func_161_a();
              return;
          }
-         boolean bl = this.mcServer.worldMngr.field_819_z = this.mcServer.configManager.isOp(this.playerEntity.username);
+-        boolean bl = this.mcServer.worldMngr.field_819_z = this.mcServer.configManager.isOp(this.playerEntity.username);
 -        boolean bl2 = false;
 -        if (packet14BlockDig.status == 0) {
 -            bl2 = true;
 -        }
++        // boolean bl = this.mcServer.worldMngr.field_819_z = this.mcServer.configManager.isOp(this.playerEntity.username); // Dart - remove check
 +        boolean bl2 = packet14BlockDig.status == 0;
          if (packet14BlockDig.status == 1) {
              bl2 = true;
@@ -525,7 +543,7 @@ index 3d9fe4d..c249a27 100644
              double d8 = d5 * d5 + d6 * d6 + d7 * d7;
              if (d8 > 36.0) {
                  return;
-@@ -200,8 +199,8 @@ implements ICommandListener {
+@@ -200,21 +199,21 @@ implements ICommandListener {
              this.playerEntity.posY = d9;
          }
          int n5 = packet14BlockDig.face;
@@ -536,8 +554,15 @@ index 3d9fe4d..c249a27 100644
              n = n6;
          }
          if (packet14BlockDig.status == 0) {
-@@ -214,7 +213,7 @@ implements ICommandListener {
-             if (n > 16 || bl) {
+-            if (n > 16 || bl) {
++            if (mcServer.canUpdateBlock(playerEntity, n)) { // Dart: check if player can update block
+                 this.playerEntity.field_425_ad.func_324_a(n2, n3, n4);
+             }
+         } else if (packet14BlockDig.status == 2) {
+             this.playerEntity.field_425_ad.func_328_a();
+         } else if (packet14BlockDig.status == 1) {
+-            if (n > 16 || bl) {
++            if (mcServer.canUpdateBlock(playerEntity, n)) { // Dart: check if player can update block
                  this.playerEntity.field_425_ad.func_326_a(n2, n3, n4, n5);
              }
 -        } else if (packet14BlockDig.status == 3 && (d4 = (d3 = this.playerEntity.posX - ((double)n2 + 0.5)) * d3 + (d2 = this.playerEntity.posY - ((double)n3 + 0.5)) * d2 + (d = this.playerEntity.posZ - ((double)n4 + 0.5)) * d) < 256.0) {
@@ -545,7 +570,16 @@ index 3d9fe4d..c249a27 100644
              this.playerEntity.netServerHandler.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
          }
          this.mcServer.worldMngr.field_819_z = false;
-@@ -234,8 +233,8 @@ implements ICommandListener {
+@@ -222,7 +221,7 @@ implements ICommandListener {
+ 
+     public void handlePlace(Packet15Place packet15Place) {
+         ItemStack itemStack = this.playerEntity.inventory.getCurrentItem();
+-        boolean bl = this.mcServer.worldMngr.field_819_z = this.mcServer.configManager.isOp(this.playerEntity.username);
++        // boolean bl = this.mcServer.worldMngr.field_819_z = this.mcServer.configManager.isOp(this.playerEntity.username); // Dart - remove check
+         if (packet15Place.zPosition == 255) {
+             if (itemStack == null) {
+                 return;
+@@ -234,11 +233,11 @@ implements ICommandListener {
              int n3 = packet15Place.xPosition;
              int n4 = packet15Place.yPosition;
              int n5 = packet15Place.zPosition;
@@ -555,7 +589,11 @@ index 3d9fe4d..c249a27 100644
 +            if (n6 > (n = (int) MathHelper.abs(n4 - this.mcServer.worldMngr.spawnZ))) {
                  n = n6;
              }
-             if (n > 16 || bl) {
+-            if (n > 16 || bl) {
++            if (mcServer.canUpdateBlock(playerEntity, n)) { // Dart: check if player can update block
+                 this.playerEntity.field_425_ad.func_327_a(this.playerEntity, this.mcServer.worldMngr, itemStack, n2, n3, n4, n5);
+             }
+             this.playerEntity.netServerHandler.sendPacket(new Packet53BlockChange(n2, n3, n4, this.mcServer.worldMngr));
 @@ -284,7 +283,7 @@ implements ICommandListener {
      }
  
@@ -1246,7 +1284,7 @@ index fd13b57..4760330 100644
              return false;
          }
 diff --git a/main/java/net/minecraft/server/MinecraftServer.java b/main/java/net/minecraft/server/MinecraftServer.java
-index 510c39e..e1d90bb 100644
+index 510c39e..930df0c 100644
 --- a/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/main/java/net/minecraft/server/MinecraftServer.java
 @@ -3,7 +3,6 @@
@@ -1365,11 +1403,14 @@ index 510c39e..e1d90bb 100644
      }
  
      private void func_6011_e() {
-@@ -149,6 +149,7 @@ Runnable {
+@@ -147,8 +147,9 @@ Runnable {
+         this.worldMngr.saveWorld(true, null);
+     }
  
-     private void stop() {
+-    private void stop() {
++    protected void stop() {
          logger.info("Stopping server");
-+        super.onStop(); // Dart
++        super.onStop();
          if (this.configManager != null) {
              this.configManager.savePlayerStates();
          }
