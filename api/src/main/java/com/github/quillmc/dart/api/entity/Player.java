@@ -8,4 +8,6 @@ public interface Player {
     boolean isOp();
 
     void sendMessage(String message);
+
+    void disconnect(String reason);
 }
