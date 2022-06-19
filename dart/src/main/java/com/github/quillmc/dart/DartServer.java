@@ -46,11 +46,12 @@ public abstract class DartServer<P extends Player> implements Server<P> {
         pluginFramework.findAndLoadPlugins();
     }
 
-    public void onReady() {
+    protected void onReady() {
         pluginManager.enableAll();
     }
 
-    public void onStop() {
+    protected void onStop() {
+        logger.info("Disabling plugins");
         pluginManager.disableAll();
     }
 
@@ -75,6 +76,8 @@ public abstract class DartServer<P extends Player> implements Server<P> {
         if (e.isCancelled()) return Optional.empty();
         else return Optional.of(chatFormatter.format(player, chat));
     }
+
+    protected abstract void stop();
 
     public abstract void broadcast(String msg);
 
