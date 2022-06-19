@@ -48,6 +48,8 @@ public abstract class DartServer<P extends Player> implements Server<P> {
                 .build());
         logger.info("Loading plugins");
         pluginFramework.findAndLoadPlugins();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(this::stop)); // Stop the server when the JVM shuts down
     }
 
     protected void onReady() {
