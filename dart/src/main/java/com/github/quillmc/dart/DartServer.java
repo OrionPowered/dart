@@ -81,6 +81,11 @@ public abstract class DartServer<P extends Player> implements Server<P> {
         else return Optional.of(chatFormatter.format(player, chat));
     }
 
+    public boolean canUpdateBlock(Player player, int distanceFromSpawn) {
+        int spawnProtection = config.getInt("spawn_protection");
+        return spawnProtection == -1 || player.isOp() || distanceFromSpawn > spawnProtection;
+    }
+
     protected abstract void stop();
 
     public abstract void broadcast(String msg);
